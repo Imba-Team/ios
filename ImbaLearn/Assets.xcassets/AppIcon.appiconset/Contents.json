@@ -1,6 +1,7 @@
 {
   "images" : [
     {
+      "filename" : "image_1_1764369201326-removebg-preview-1024x1024.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"
@@ -23,6 +24,7 @@
           "value" : "tinted"
         }
       ],
+      "filename" : "image_1_1764369201326-removebg-preview-1024x1024 1.png",
       "idiom" : "universal",
       "platform" : "ios",
       "size" : "1024x1024"

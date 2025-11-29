@@ -97,7 +97,7 @@ class AllModulesCell: UICollectionViewCell {
     
     private lazy var iconContainer: UIView = {
         let view = UIView()
-        view.backgroundColor = .color2
+        view.backgroundColor = .color3
         view.layer.cornerRadius = 8
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
@@ -106,14 +106,14 @@ class AllModulesCell: UICollectionViewCell {
     private lazy var iconImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
-        imageView.tintColor = .color1
+        imageView.tintColor = .pinkButton
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
     }()
     
     private lazy var nameLabel: UILabel = {
         let label = UILabel()
-        label.textColor = .color1
+        label.textColor = .text
         label.font = UIFont.boldSystemFont(ofSize: 14)
         label.numberOfLines = 1
         label.translatesAutoresizingMaskIntoConstraints = false

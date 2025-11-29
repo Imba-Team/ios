@@ -11,14 +11,14 @@ class StudySetCell: UICollectionViewCell {
     private lazy var iconImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
-        imageView.tintColor = .color1
+        imageView.tintColor = .color3
         imageView.translatesAutoresizingMaskIntoConstraints = false
         return imageView
     }()
     
     private lazy var nameLabel: UILabel = {
         let label = UILabel()
-        label.textColor = .color1
+        label.textColor = .black
         label.font = UIFont.boldSystemFont(ofSize: 16)
         label.textAlignment = .center
         label.numberOfLines = 2
@@ -29,7 +29,7 @@ class StudySetCell: UICollectionViewCell {
     private lazy var progressView: UIProgressView = {
         let progressView = UIProgressView(progressViewStyle: .default)
         progressView.trackTintColor = .systemGray5
-        progressView.progressTintColor = .color2
+        progressView.progressTintColor = .greenButton
         progressView.layer.cornerRadius = 4
         progressView.clipsToBounds = true
         progressView.translatesAutoresizingMaskIntoConstraints = false
@@ -38,7 +38,7 @@ class StudySetCell: UICollectionViewCell {
     
     private lazy var percentageLabel: UILabel = {
         let label = UILabel()
-        label.textColor = .color1
+        label.textColor = .greenButton
         label.font = UIFont.systemFont(ofSize: 12)
         label.textAlignment = .center
         label.translatesAutoresizingMaskIntoConstraints = false
@@ -48,8 +48,8 @@ class StudySetCell: UICollectionViewCell {
     lazy var continueButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle("Continue", for: .normal)
-        button.backgroundColor = .color2
-        button.setTitleColor(.color1, for: .normal)
+        button.backgroundColor = .greenButton
+        button.setTitleColor(.white, for: .normal)
         button.layer.cornerRadius = 8
         button.titleLabel?.font = UIFont.boldSystemFont(ofSize: 14)
         button.translatesAutoresizingMaskIntoConstraints = false

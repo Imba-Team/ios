@@ -34,7 +34,7 @@ class HomeViewController: BaseViewController {
     private lazy var continueLearningLabel: UILabel = {
         let label = UILabel()
         label.text = "Continue Learning"
-        label.textColor = .color1
+        label.textColor = .text
         label.font = UIFont.boldSystemFont(ofSize: 24)
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
@@ -56,7 +56,7 @@ class HomeViewController: BaseViewController {
     private lazy var allModulesLabel: UILabel = {
         let label = UILabel()
         label.text = "All Modules"
-        label.textColor = .color1
+        label.textColor = .text
         label.font = UIFont.boldSystemFont(ofSize: 24)
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
