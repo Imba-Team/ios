@@ -40,54 +40,18 @@ class RegisterViewController: BaseViewController {
         return label
     }()
     
-//    private lazy var registerLabel: UILabel = {
-//        let label = UILabel()
-//        label.text = "Register"
-//        label.textColor = .text
-//        label.font = .systemFont(ofSize: 32, weight: .bold)
-//        label.textAlignment = .center
-//        label.translatesAutoresizingMaskIntoConstraints = false
-//        return label
-//    }()
-    
-    private lazy var firstNameLabel: UILabel = {
+    private lazy var fullNameLabel: UILabel = {
         let label = UILabel()
-        label.text = "First Name"
+        label.text = "Full Name"
         label.textColor = .text
         label.font = .systemFont(ofSize: 18, weight: .bold)
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     
-    private lazy var firstNameTextField: UITextField = {
+    private lazy var fullNameTextField: UITextField = {
         let textField = UITextField()
-        textField.placeholder = "Enter your first name"
-        textField.borderStyle = .none
-        textField.autocapitalizationType = .words
-        textField.backgroundColor = .white
-        textField.layer.cornerRadius = 12
-        textField.layer.masksToBounds = true
-        textField.translatesAutoresizingMaskIntoConstraints = false
-        
-        let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: textField.frame.height))
-        textField.leftView = paddingView
-        textField.leftViewMode = .always
-        
-        return textField
-    }()
-    
-    private lazy var lastNameLabel: UILabel = {
-        let label = UILabel()
-        label.text = "Last Name"
-        label.textColor = .text
-        label.font = .systemFont(ofSize: 18, weight: .bold)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        return label
-    }()
-    
-    private lazy var lastNameTextField: UITextField = {
-        let textField = UITextField()
-        textField.placeholder = "Enter your last name"
+        textField.placeholder = "Enter your full name"
         textField.borderStyle = .none
         textField.autocapitalizationType = .words
         textField.backgroundColor = .white
@@ -206,7 +170,6 @@ class RegisterViewController: BaseViewController {
         super.viewDidLoad()
         setupUI()
         setupConstraints()
-      //  setupGradientHeader()
         setupTextFields()
     }
     
@@ -223,8 +186,8 @@ class RegisterViewController: BaseViewController {
         // Add title label to header
         headerView.addSubview(titleLabel)
         
-        // Add all form elements to contentView
-        contentView.addSubviews(firstNameLabel, firstNameTextField, lastNameLabel, lastNameTextField, emailLabel, emailTextField, passwordLabel, passwordTextField, confirmPasswordLabel, confirmPasswordTextField, registerButton, loginButton)
+        // Add all form elements to contentView (only full name, no separate first/last)
+        contentView.addSubviews(fullNameLabel, fullNameTextField, emailLabel, emailTextField, passwordLabel, passwordTextField, confirmPasswordLabel, confirmPasswordTextField, registerButton, loginButton)
         
         registerButton.addTarget(self, action: #selector(registerTapped), for: .touchUpInside)
         loginButton.addTarget(self, action: #selector(loginTapped), for: .touchUpInside)
@@ -232,40 +195,13 @@ class RegisterViewController: BaseViewController {
     
     private func setupTextFields() {
         // Set up text field delegates
-        let textFields = [firstNameTextField, lastNameTextField, emailTextField, passwordTextField, confirmPasswordTextField]
+        let textFields = [fullNameTextField, emailTextField, passwordTextField, confirmPasswordTextField]
         textFields.forEach { textField in
             textField.delegate = self
         }
         
         // Enable keyboard avoidance
         setupKeyboardAvoidance(with: scrollView)
-    }
-    
-//    private func setupGradientHeader() {
-//        // Create gradient layer
-//        let gradientLayer = CAGradientLayer()
-//        gradientLayer.colors = [
-//            UIColor.pinkButton.withAlphaComponent(0.7).cgColor, // Lighter pink
-//            UIColor.greenButton.withAlphaComponent(0.7).cgColor
-//        ]
-//        gradientLayer.locations = [0.0, 1.0]
-//        gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.5)
-//        gradientLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
-//        
-//        // Set the frame after layout
-//        DispatchQueue.main.async {
-//            gradientLayer.frame = self.headerView.bounds
-//        }
-//        
-//        headerView.layer.insertSublayer(gradientLayer, at: 0)
-//    }
-    
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // Update gradient layer frame when view layout changes
-        if let gradientLayer = headerView.layer.sublayers?.first as? CAGradientLayer {
-            gradientLayer.frame = headerView.bounds
-        }
     }
     
     private func setupConstraints() {
@@ -299,37 +235,20 @@ class RegisterViewController: BaseViewController {
             contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
             contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
             
-            // Register Label - at top of content view
-//            registerLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 30),
-//            registerLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
-//            registerLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-//            
-            // First Name Label
-            firstNameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 30),
-            firstNameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
-            firstNameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            firstNameLabel.heightAnchor.constraint(equalToConstant: labelHeight),
+            // Full Name Label
+            fullNameLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 30),
+            fullNameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            fullNameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
+            fullNameLabel.heightAnchor.constraint(equalToConstant: labelHeight),
             
-            // First Name Text Field
-            firstNameTextField.topAnchor.constraint(equalTo: firstNameLabel.bottomAnchor, constant: 8),
-            firstNameTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
-            firstNameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            firstNameTextField.heightAnchor.constraint(equalToConstant: fieldHeight),
-            
-            // Last Name Label
-            lastNameLabel.topAnchor.constraint(equalTo: firstNameTextField.bottomAnchor, constant: 20),
-            lastNameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
-            lastNameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            lastNameLabel.heightAnchor.constraint(equalToConstant: labelHeight),
-            
-            // Last Name Text Field
-            lastNameTextField.topAnchor.constraint(equalTo: lastNameLabel.bottomAnchor, constant: 8),
-            lastNameTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
-            lastNameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            lastNameTextField.heightAnchor.constraint(equalToConstant: fieldHeight),
+            // Full Name Text Field
+            fullNameTextField.topAnchor.constraint(equalTo: fullNameLabel.bottomAnchor, constant: 8),
+            fullNameTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            fullNameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
+            fullNameTextField.heightAnchor.constraint(equalToConstant: fieldHeight),
             
             // Email Label
-            emailLabel.topAnchor.constraint(equalTo: lastNameTextField.bottomAnchor, constant: 20),
+            emailLabel.topAnchor.constraint(equalTo: fullNameTextField.bottomAnchor, constant: 20),
             emailLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             emailLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             emailLabel.heightAnchor.constraint(equalToConstant: labelHeight),
@@ -378,12 +297,239 @@ class RegisterViewController: BaseViewController {
         ])
     }
     
+    // MARK: - Actions
     @objc private func registerTapped() {
-        // TODO: Implement registration logic
-        navigationController?.popViewController(animated: true)
+        // Hide keyboard
+        view.endEditing(true)
+        
+        // Validate inputs
+        guard validateInputs() else { return }
+        
+        // Show loading
+        showLoading()
+        
+        // Create request with single name field
+        let registerRequest = RegisterRequest(
+            name: fullNameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            email: emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
+            password: passwordTextField.text ?? ""
+        )
+        
+        print("Sending registration request with name: \(registerRequest.name)")
+        
+        // Call API
+        NetworkManager.shared.register(request: registerRequest) { [weak self] result in
+            DispatchQueue.main.async {
+                self?.hideLoading()
+                self?.handleRegistrationResult(result)
+            }
+        }
     }
     
     @objc private func loginTapped() {
         navigationController?.popViewController(animated: true)
+    }
+    
+    // MARK: - Validation
+    private func validateInputs() -> Bool {
+        // Validate full name
+        guard let fullName = fullNameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !fullName.isEmpty else {
+            showAlert(title: "Validation Error", message: "Please enter your full name")
+            fullNameTextField.becomeFirstResponder()
+            return false
+        }
+        
+        // Validate email
+        guard let email = emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !email.isEmpty else {
+            showAlert(title: "Validation Error", message: "Please enter your email")
+            emailTextField.becomeFirstResponder()
+            return false
+        }
+        
+        guard isValidEmail(email) else {
+            showAlert(title: "Validation Error", message: "Please enter a valid email address")
+            emailTextField.becomeFirstResponder()
+            return false
+        }
+        
+        // Validate password
+        guard let password = passwordTextField.text, !password.isEmpty else {
+            showAlert(title: "Validation Error", message: "Please enter a password")
+            passwordTextField.becomeFirstResponder()
+            return false
+        }
+        
+        guard password.count >= 6 else {
+            showAlert(title: "Validation Error", message: "Password must be at least 6 characters")
+            passwordTextField.becomeFirstResponder()
+            return false
+        }
+        
+        // Validate confirm password
+        guard let confirmPassword = confirmPasswordTextField.text,
+              !confirmPassword.isEmpty else {
+            showAlert(title: "Validation Error", message: "Please confirm your password")
+            confirmPasswordTextField.becomeFirstResponder()
+            return false
+        }
+        
+        guard password == confirmPassword else {
+            showAlert(title: "Validation Error", message: "Passwords do not match")
+            confirmPasswordTextField.becomeFirstResponder()
+            return false
+        }
+        
+        return true
+    }
+    
+    private func isValidEmail(_ email: String) -> Bool {
+        let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
+        let emailPred = NSPredicate(format: "SELF MATCHES %@", emailRegEx)
+        return emailPred.evaluate(with: email)
+    }
+    
+    // MARK: - Handle Registration Result
+    private func handleRegistrationResult(_ result: Result<AuthResponse, NetworkError>) {
+        switch result {
+        case .success(let response):
+            if response.ok {  // Changed from response.status == "success"
+                // Token is already saved from cookies in NetworkManager
+                
+                // Show success message
+                showSuccessAlert(message: response.message)
+            } else {
+                // API returned error
+                showAlert(title: "Registration Failed", message: response.message)
+            }
+            
+        case .failure(let error):
+            handleNetworkError(error)
+        }
+    }
+
+    
+    private func handleNetworkError(_ error: NetworkError) {
+        switch error {
+        case .invalidURL:
+            showAlert(title: "Error", message: "Invalid URL configuration")
+        case .noData:
+            showAlert(title: "Error", message: "No response from server")
+        case .decodingError(let decodingError):
+            showAlert(title: "Error", message: "Failed to process server response: \(decodingError.localizedDescription)")
+        case .encodingError(let encodingError):
+            showAlert(title: "Error", message: "Failed to prepare request: \(encodingError.localizedDescription)")
+        case .serverError(let message):
+            // Try to parse array error messages
+            if let data = message.data(using: .utf8),
+               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                
+                if let messages = json["message"] as? [String] {
+                    // Error messages in array format
+                    let errorMessage = messages.joined(separator: "\n")
+                    showAlert(title: "Validation Error", message: errorMessage)
+                } else if let errorMessage = json["message"] as? String {
+                    // Single error message
+                    showAlert(title: "Error", message: errorMessage)
+                } else {
+                    showAlert(title: "Error", message: message)
+                }
+            } else {
+                showAlert(title: "Error", message: message)
+            }
+        case .unauthorized:
+            showAlert(title: "Session Expired", message: "Please login again")
+        case .forbidden:
+            showAlert(title: "Access Denied", message: "You don't have permission")
+        case .notFound:
+            showAlert(title: "Not Found", message: "Resource not found")
+        case .rateLimited:
+            showAlert(title: "Too Many Requests", message: "Please try again later")
+        case .networkError(let networkError):
+            showAlert(title: "Network Error", message: networkError.localizedDescription)
+        case .unknown:
+            showAlert(title: "Error", message: "An unknown error occurred")
+        }
+    }
+    
+    private func showSuccessAlert(message: String) {
+        let alert = UIAlertController(
+            title: "Success!",
+            message: "\(message)\n\nYou have been automatically logged in.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "Continue", style: .default) { [weak self] _ in
+            // Navigate to main screen since user is logged in
+            self?.navigateToMainScreen()
+        })
+        
+        present(alert, animated: true)
+    }
+    
+    private func navigateToMainScreen() {
+        // Check if we have a token (user should be logged in)
+        if NetworkManager.shared.authToken != nil {
+            print("✅ User is logged in, navigating to main screen")
+            
+            if let sceneDelegate = UIApplication.shared.connectedScenes.first?.delegate as? SceneDelegate {
+                       sceneDelegate.showMainApp()
+                   }
+               } else {
+                   // Go back to login
+                   navigationController?.popViewController(animated: true)
+               }
+    }
+
+    
+    // MARK: - Helper Methods
+    private func showLoading() {
+        let loadingView = UIView(frame: view.bounds)
+        loadingView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        loadingView.tag = 999
+        
+        let activityIndicator = UIActivityIndicatorView(style: .large)
+        activityIndicator.center = loadingView.center
+        activityIndicator.startAnimating()
+        loadingView.addSubview(activityIndicator)
+        
+        view.addSubview(loadingView)
+        view.isUserInteractionEnabled = false
+    }
+    
+    private func hideLoading() {
+        view.subviews.forEach { subview in
+            if subview.tag == 999 {
+                subview.removeFromSuperview()
+            }
+        }
+        view.isUserInteractionEnabled = true
+    }
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+}
+
+// MARK: - UITextFieldDelegate
+extension RegisterViewController {
+    override func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        switch textField {
+        case fullNameTextField:
+            emailTextField.becomeFirstResponder()
+        case emailTextField:
+            passwordTextField.becomeFirstResponder()
+        case passwordTextField:
+            confirmPasswordTextField.becomeFirstResponder()
+        case confirmPasswordTextField:
+            textField.resignFirstResponder()
+            registerTapped()
+        default:
+            textField.resignFirstResponder()
+        }
+        return true
     }
 }

@@ -62,6 +62,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         libraryVC.tabBarItem = UITabBarItem(title: "Library", image: UIImage(systemName: "books.vertical"), tag: 2)
         accountVC.tabBarItem = UITabBarItem(title: "Account", image: UIImage(systemName: "person"), tag: 3)
         
+        tabBarController.tabBar.tintColor = .darkGray
+        tabBarController.tabBar.unselectedItemTintColor = .lightGray
+        
         // Set up tab bar controller
         tabBarController.viewControllers = [homeVC, createSetVC, libraryVC, accountVC]
         tabBarController.selectedIndex = 0

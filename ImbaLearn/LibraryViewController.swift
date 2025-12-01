@@ -323,9 +323,6 @@ extension LibraryViewController: UITableViewDataSource, UITableViewDelegate {
     }
 }
 
-// MARK: - ModuleCell
-
-
 // MARK: - StudySet Model
 struct StudySett {
     let title: String

@@ -127,6 +127,9 @@ class LoginViewController: BaseViewController {
         setupConstraints()
         setupGradientHeader()
         setupTextFields()
+        testLoginEndpoint()
+        
+        
     }
     
     private func setupUI() {
@@ -269,6 +272,30 @@ class LoginViewController: BaseViewController {
     @objc private func registerTapped() {
         let registerVC = RegisterViewController()
         navigationController?.pushViewController(registerVC, animated: true)
+    }
+    
+    // In LoginViewController.swift, add this method:
+    private func testLoginEndpoint() {
+        let testRequest = LoginRequest(
+            email: "leylaaliyeva325@gmail.com",  // Use your registered email
+                   password: "12345678" 
+        )
+        
+        print("Testing login endpoint...")
+        
+        NetworkManager.shared.login(request: testRequest) { result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let response):
+                    print("✅ Login endpoint test SUCCESS")
+                    print("Response: ok=\(response.ok), message=\(response.message)")
+                    
+                case .failure(let error):
+                    print("❌ Login endpoint test FAILED")
+                    print("Error: \(error.localizedDescription)")
+                }
+            }
+        }
     }
     
     private func showMainApp() {
