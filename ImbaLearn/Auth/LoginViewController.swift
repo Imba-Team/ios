@@ -338,6 +338,16 @@ class LoginViewController: BaseViewController {
         switch result {
         case .success(let response):
             if response.ok {
+                // Try to get user data if available in response
+                // For now, save basic info
+                if let email = emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) {
+                    UserDefaults.standard.set(email, forKey: "userEmail")
+                    // Try to extract name from email or use placeholder
+                    let name = email.components(separatedBy: "@").first ?? "User"
+                    UserDefaults.standard.set(name, forKey: "userName")
+                    UserDefaults.standard.synchronize()
+                }
+                
                 // Add a small delay for better UX
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
                     // Navigate with animation

@@ -246,6 +246,44 @@ class NetworkManager {
         post(endpoint: "/auth/login", body: request, completion: completion)
     }
     
+    // LOGOUT METHOD:
+    func logout(completion: @escaping (Result<AuthResponse, NetworkError>) -> Void) {
+        request(endpoint: "/auth/logout", method: .post, requiresAuth: true, completion: completion)
+    }
+
+    // User Profile Endpoint
+    func getUserProfile(completion: @escaping (Result<UserProfileResponse, NetworkError>) -> Void) {
+        request(endpoint: "/users/me", method: .get, requiresAuth: true, completion: completion)
+    }
+
+    // Update profile method
+    func updateProfile(name: String, email: String, completion: @escaping (Result<UserProfileResponse, NetworkError>) -> Void) {
+        let body = ["name": name, "email": email]
+        post(endpoint: "/users/me", body: body, requiresAuth: true, completion: completion)
+    }
+
+    // Change Password Method
+    func changePassword(oldPassword: String, newPassword: String, confirmPassword: String, completion: @escaping (Result<AuthResponse, NetworkError>) -> Void) {
+        let body = [
+            "oldPassword": oldPassword,
+            "newPassword": newPassword,
+            "confirmPassword": confirmPassword
+        ]
+        
+        // Use PATCH method
+        do {
+            let bodyData = try encoder.encode(body)
+            request(endpoint: "/users/me/change-password", method: .patch, body: bodyData, requiresAuth: true, completion: completion)
+        } catch {
+            completion(.failure(.encodingError(error)))
+        }
+    }
+    
+    // Delete Account
+    func deleteAccount(completion: @escaping (Result<AuthResponse, NetworkError>) -> Void) {
+        request(endpoint: "/users/me", method: .delete, requiresAuth: true, completion: completion)
+    }
+    
     // MARK: - Helper Methods
     private func parseErrorMessage(from data: Data) -> String {
         do {

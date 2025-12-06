@@ -394,10 +394,16 @@ class RegisterViewController: BaseViewController {
     private func handleRegistrationResult(_ result: Result<AuthResponse, NetworkError>) {
         switch result {
         case .success(let response):
-            if response.ok {  // Changed from response.status == "success"
-                // Token is already saved from cookies in NetworkManager
+            if response.ok {
+                // Save user info from registration
+                let name = fullNameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let email = emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 
-                // Show success message
+                UserDefaults.standard.set(name, forKey: "userName")
+                UserDefaults.standard.set(email, forKey: "userEmail")
+                UserDefaults.standard.synchronize()
+                
+                // Show success
                 showSuccessAlert(message: response.message)
             } else {
                 // API returned error
