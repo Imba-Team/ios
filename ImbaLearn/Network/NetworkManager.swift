@@ -284,6 +284,80 @@ class NetworkManager {
         request(endpoint: "/users/me", method: .delete, requiresAuth: true, completion: completion)
     }
     
+    // MARK: - Module Methods
+    func createModule(request: CreateModuleRequest, completion: @escaping (Result<CreateModuleResponse, NetworkError>) -> Void) {
+        do {
+            // Create a custom encoder that doesn't convert to snake_case
+            let customEncoder = JSONEncoder()
+            customEncoder.keyEncodingStrategy = .useDefaultKeys // Use camelCase as-is
+            customEncoder.outputFormatting = .prettyPrinted
+            
+            let bodyData = try customEncoder.encode(request)
+            
+            // Debug: Print what we're sending
+            if let jsonString = String(data: bodyData, encoding: .utf8) {
+                print("📦 Sending module request (camelCase):")
+                print(jsonString)
+            }
+            
+            // Use a different variable name to avoid conflict
+            let endpoint = "/modules"
+            
+            // Call the generic request method
+            self.request(endpoint: endpoint, method: .post, body: bodyData, requiresAuth: true, completion: completion)
+        } catch {
+            completion(.failure(.encodingError(error)))
+        }
+    }
+
+    func getUserModules(completion: @escaping (Result<UserModulesResponse, NetworkError>) -> Void) {
+        request(endpoint: "/modules", method: .get, requiresAuth: true, completion: completion)
+    }
+
+    func getModuleById(moduleId: String, completion: @escaping (Result<CreateModuleResponse, NetworkError>) -> Void) {
+        request(endpoint: "/modules/\(moduleId)", method: .get, requiresAuth: true, completion: completion)
+    }
+
+//    func updateModule(moduleId: String, request: CreateModuleRequest, completion: @escaping (Result<CreateModuleResponse, NetworkError>) -> Void) {
+//        do {
+//            let bodyData = try encoder.encode(request)
+//            request(endpoint: "/modules/\(moduleId)", method: .put, body: bodyData, requiresAuth: true, completion: completion)
+//        } catch {
+//            completion(.failure(.encodingError(error)))
+//        }
+//    }
+
+    func deleteModule(moduleId: String, completion: @escaping (Result<AuthResponse, NetworkError>) -> Void) {
+        request(endpoint: "/modules/\(moduleId)", method: .delete, requiresAuth: true, completion: completion)
+    }
+
+    // MARK: - Term Methods (for adding terms to module)
+    func createTerm(request: CreateTermRequest, completion: @escaping (Result<CreateTermResponse, NetworkError>) -> Void) {
+        do {
+            // Use camelCase encoder for terms
+            let customEncoder = JSONEncoder()
+            customEncoder.keyEncodingStrategy = .useDefaultKeys  // camelCase
+            customEncoder.outputFormatting = .prettyPrinted
+            
+            let bodyData = try customEncoder.encode(request)
+            
+            // Debug print
+            if let jsonString = String(data: bodyData, encoding: .utf8) {
+                print("📦 Sending term request to /terms:")
+                print(jsonString)
+            }
+            
+            // Endpoint is /terms (not /modules/{id}/terms)
+            self.request(endpoint: "/terms", method: .post, body: bodyData, requiresAuth: true, completion: completion)
+        } catch {
+            completion(.failure(.encodingError(error)))
+        }
+    }
+
+    func getModuleTerms(moduleId: String, completion: @escaping (Result<TermsListResponse, NetworkError>) -> Void) {
+        request(endpoint: "/modules/\(moduleId)/terms", method: .get, requiresAuth: true, completion: completion)
+    }
+
     // MARK: - Helper Methods
     private func parseErrorMessage(from data: Data) -> String {
         do {

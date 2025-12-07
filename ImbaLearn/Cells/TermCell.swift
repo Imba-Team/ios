@@ -8,7 +8,7 @@ import UIKit
 
 class TermCell: UITableViewCell {
     
-    private lazy var termTextField: UITextField = {
+     lazy var termTextField: UITextField = {
         let textField = UITextField()
         textField.placeholder = "Term"
         textField.borderStyle = .none
@@ -77,8 +77,20 @@ class TermCell: UITableViewCell {
         definitionTextField.addTarget(self, action: #selector(definitionTextDidChange), for: .editingChanged)
     }
     
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        // This helps with constraint warnings
+        contentView.layoutIfNeeded()
+    }
+    
     private func setupConstraints() {
         NSLayoutConstraint.activate([
+            // Delete Button - position it first
+            deleteButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+            deleteButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
+            deleteButton.widthAnchor.constraint(equalToConstant: 24),
+            deleteButton.heightAnchor.constraint(equalToConstant: 24),
+            
             // Term Text Field
             termTextField.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
             termTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
@@ -90,13 +102,7 @@ class TermCell: UITableViewCell {
             definitionTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 10),
             definitionTextField.trailingAnchor.constraint(equalTo: deleteButton.leadingAnchor, constant: -10),
             definitionTextField.heightAnchor.constraint(equalToConstant: 40),
-            definitionTextField.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
-            
-            // Delete Button
-            deleteButton.centerYAnchor.constraint(equalTo: contentView.centerYAnchor),
-            deleteButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -10),
-            deleteButton.widthAnchor.constraint(equalToConstant: 24),
-            deleteButton.heightAnchor.constraint(equalToConstant: 24)
+            definitionTextField.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10)
         ])
     }
     
@@ -108,10 +114,12 @@ class TermCell: UITableViewCell {
     }
     
     @objc private func termTextDidChange() {
-        termTextChanged?(termTextField.text ?? "")
+        let trimmedText = termTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        termTextChanged?(trimmedText)
     }
     
     @objc private func definitionTextDidChange() {
-        definitionTextChanged?(definitionTextField.text ?? "")
+        let trimmedText = definitionTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        definitionTextChanged?(trimmedText)
     }
 }

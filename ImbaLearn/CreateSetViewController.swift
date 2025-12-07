@@ -32,9 +32,8 @@ class CreateSetViewController: BaseViewController {
     
     private lazy var headerTitleLabel: UILabel = {
         let label = UILabel()
-        label.text = "Create New Set"
+        label.text = "Create New Module"
         label.textColor = .black
-    
         label.alpha = 0.6
         label.font = .systemFont(ofSize: 24, weight: .bold)
         label.textAlignment = .center
@@ -53,7 +52,7 @@ class CreateSetViewController: BaseViewController {
     
     private lazy var titleTextField: UITextField = {
         let textField = UITextField()
-        textField.placeholder = "Enter set title"
+        textField.placeholder = "Enter module title"
         textField.borderStyle = .none
         textField.backgroundColor = .white
         textField.layer.cornerRadius = 12
@@ -92,6 +91,32 @@ class CreateSetViewController: BaseViewController {
         return textField
     }()
     
+    private lazy var privacyLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Privacy"
+        label.textColor = .text
+        label.font = .systemFont(ofSize: 18, weight: .bold)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
+    private lazy var privacySwitch: UISwitch = {
+        let switchControl = UISwitch()
+        switchControl.isOn = false // Default to public (isPrivate = false)
+        switchControl.onTintColor = .pinkButton
+        switchControl.translatesAutoresizingMaskIntoConstraints = false
+        return switchControl
+    }()
+    
+    private lazy var privacyDescriptionLabel: UILabel = {
+        let label = UILabel()
+        label.text = "Private (only you can see)"
+        label.textColor = .gray
+        label.font = .systemFont(ofSize: 14)
+        label.translatesAutoresizingMaskIntoConstraints = false
+        return label
+    }()
+    
     private lazy var termsLabel: UILabel = {
         let label = UILabel()
         label.text = "Terms"
@@ -108,7 +133,8 @@ class CreateSetViewController: BaseViewController {
         tableView.separatorStyle = .none
         tableView.backgroundColor = .clear
         tableView.isScrollEnabled = false
-        tableView.rowHeight = 120
+        tableView.rowHeight = UITableView.automaticDimension
+        tableView.estimatedRowHeight = 120
         return tableView
     }()
     
@@ -140,19 +166,20 @@ class CreateSetViewController: BaseViewController {
         Term(term: "", definition: "")
     ]
     
+    private var activityIndicator: UIActivityIndicatorView?
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
         setupConstraints()
-    //    setupGradientHeader()
         setupTableView()
         setupTextFields()
     }
     
     private func setupUI() {
         view.backgroundColor = .background
-        title = "Create New Set"
+        title = "Create New Module"
         
         // Add header view directly to main view
         view.addSubview(headerView)
@@ -163,7 +190,12 @@ class CreateSetViewController: BaseViewController {
         scrollView.addSubview(contentView)
         
         // Add all form elements to contentView
-        contentView.addSubviews(titleLabel, titleTextField, descriptionLabel, descriptionTextField, termsLabel, tableView, addTermButton, saveButton)
+        contentView.addSubviews(
+            titleLabel, titleTextField,
+            descriptionLabel, descriptionTextField,
+            privacyLabel, privacySwitch, privacyDescriptionLabel,
+            termsLabel, tableView, addTermButton, saveButton
+        )
     }
     
     private func setupTableView() {
@@ -182,25 +214,6 @@ class CreateSetViewController: BaseViewController {
         setupKeyboardAvoidance(with: scrollView)
     }
     
-//    private func setupGradientHeader() {
-//        // Create gradient layer
-//        let gradientLayer = CAGradientLayer()
-//        gradientLayer.colors = [
-//            UIColor.pinkButton.cgColor,
-//            UIColor.greenButton.cgColor
-//        ]
-//        gradientLayer.locations = [0.0, 1.0]
-//        gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.5)
-//        gradientLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
-//        
-//        // Set the frame after layout
-//        DispatchQueue.main.async {
-//            gradientLayer.frame = self.headerView.bounds
-//        }
-//        
-//        headerView.layer.insertSublayer(gradientLayer, at: 0)
-//    }
-    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         // Update gradient layer frame when view layout changes
@@ -217,8 +230,7 @@ class CreateSetViewController: BaseViewController {
         let fieldHeight: CGFloat = 60
         let labelHeight: CGFloat = 20
         let headerHeight: CGFloat = 140
-        _ = view.safeAreaInsets.bottom > 0 ? view.safeAreaInsets.bottom : 20
-
+        let switchHeight: CGFloat = 31
         
         NSLayoutConstraint.activate([
             // Header View - Fixed at top
@@ -269,8 +281,24 @@ class CreateSetViewController: BaseViewController {
             descriptionTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             descriptionTextField.heightAnchor.constraint(equalToConstant: fieldHeight),
             
+            // Privacy Label
+            privacyLabel.topAnchor.constraint(equalTo: descriptionTextField.bottomAnchor, constant: 20),
+            privacyLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            privacyLabel.heightAnchor.constraint(equalToConstant: labelHeight),
+            
+            // Privacy Switch
+            privacySwitch.centerYAnchor.constraint(equalTo: privacyLabel.centerYAnchor),
+            privacySwitch.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
+            privacySwitch.heightAnchor.constraint(equalToConstant: switchHeight),
+            
+            // Privacy Description Label
+            privacyDescriptionLabel.topAnchor.constraint(equalTo: privacyLabel.bottomAnchor, constant: 4),
+            privacyDescriptionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            privacyDescriptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
+            privacyDescriptionLabel.heightAnchor.constraint(equalToConstant: labelHeight),
+            
             // Terms Label
-            termsLabel.topAnchor.constraint(equalTo: descriptionTextField.bottomAnchor, constant: 30),
+            termsLabel.topAnchor.constraint(equalTo: privacyDescriptionLabel.bottomAnchor, constant: 20),
             termsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             termsLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             termsLabel.heightAnchor.constraint(equalToConstant: labelHeight),
@@ -304,30 +332,70 @@ class CreateSetViewController: BaseViewController {
         // Scroll to the new term
         let lastIndex = IndexPath(row: terms.count - 1, section: 0)
         tableView.scrollToRow(at: lastIndex, at: .bottom, animated: true)
+        
+        // Focus on the term text field of the new cell
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            if let cell = self.tableView.cellForRow(at: lastIndex) as? TermCell {
+                cell.termTextField.becomeFirstResponder()
+            }
+        }
     }
     
     @objc private func saveTapped() {
-        // TODO: Implement save logic
-        print("Saving set: \(titleTextField.text ?? "")")
-        print("Terms: \(terms)")
-        
         // Validate required fields
-        guard let title = titleTextField.text, !title.isEmpty else {
-            showAlert(message: "Please enter a title for your set")
+        guard let title = titleTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !title.isEmpty else {
+            showAlert(message: "Please enter a title for your module")
             return
         }
         
         // Validate that at least one term has both fields filled
-        let validTerms = terms.filter { !$0.term.isEmpty && !$0.definition.isEmpty }
+        let validTerms = terms.filter {
+            !$0.term.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
+            !$0.definition.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        
         guard !validTerms.isEmpty else {
             showAlert(message: "Please add at least one term with both term and definition")
             return
         }
         
-        // Save logic here
-
-        resetForm()
-        showAlert(message: "Set saved successfully!")
+        // Create module request (no terms in the initial request)
+        let moduleRequest = CreateModuleRequest(
+            title: title,
+            description: descriptionTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+            isPrivate: privacySwitch.isOn // Use the switch value
+        )
+        
+        // Show loading indicator
+        showLoadingIndicator(true)
+        
+        print("📦 Step 1: Creating module...")
+        
+        // Step 1: Create the module
+        NetworkManager.shared.createModule(request: moduleRequest) { [weak self] result in
+            switch result {
+            case .success(let response):
+                if response.ok, let moduleId = response.data?.id {
+                    print("✅ Module created! ID: \(moduleId)")
+                    
+                    // Step 2: Add all terms to the module
+                    self?.addTermsToModule(moduleId: moduleId, terms: validTerms)
+                } else {
+                    DispatchQueue.main.async {
+                        self?.showLoadingIndicator(false)
+                        self?.showAlert(message: response.message)
+                    }
+                }
+                
+            case .failure(let error):
+                DispatchQueue.main.async {
+                    self?.showLoadingIndicator(false)
+                    self?.handleNetworkError(error)
+                    print("❌ Failed to create module: \(error)")
+                }
+            }
+        }
     }
     
     @objc private func deleteTermTapped(_ sender: UIButton) {
@@ -341,10 +409,59 @@ class CreateSetViewController: BaseViewController {
     
     // MARK: - Helper Methods
     
+    private func addTermsToModule(moduleId: String, terms: [Term]) {
+        print("📦 Step 2: Adding \(terms.count) terms to module \(moduleId)...")
+        
+        let dispatchGroup = DispatchGroup()
+        var successfulTerms = 0
+        var errors: [String] = []
+        
+        for (index, term) in terms.enumerated() {
+            dispatchGroup.enter()
+            
+            // Convert to CreateTermRequest
+            let termRequest = term.toCreateTermRequest(moduleId: moduleId)
+            
+            NetworkManager.shared.createTerm(request: termRequest) { result in
+                switch result {
+                case .success(let response):
+                    if response.ok {
+                        print("✅ Term \(index + 1) added successfully")
+                        successfulTerms += 1
+                    } else {
+                        errors.append("Term \(index + 1): \(response.message)")
+                    }
+                case .failure(let error):
+                    errors.append("Term \(index + 1): \(error.localizedDescription)")
+                }
+                dispatchGroup.leave()
+            }
+        }
+        
+        dispatchGroup.notify(queue: .main) { [weak self] in
+            self?.showLoadingIndicator(false)
+            
+            if errors.isEmpty {
+                // All terms added successfully
+                let message = "✅ Module created with \(successfulTerms) terms!"
+                print(message)
+                self?.showSuccessAlert(message: message)
+                self?.resetForm()
+            } else {
+                // Some terms failed
+                let errorMessage = "Module created but \(errors.count) terms failed:\n" + errors.joined(separator: "\n")
+                self?.showAlert(message: errorMessage)
+                // Still reset form since module was created
+                self?.resetForm()
+            }
+        }
+    }
+    
     private func resetForm() {
         // Clear text fields
         titleTextField.text = ""
         descriptionTextField.text = ""
+        privacySwitch.isOn = false
         
         // Reset to initial two empty terms
         terms = [
@@ -373,10 +490,65 @@ class CreateSetViewController: BaseViewController {
         view.layoutIfNeeded()
     }
     
-    private func showAlert(message: String) {
+    private func showLoadingIndicator(_ show: Bool) {
+        if show {
+            // Disable the save button to prevent multiple taps
+            saveButton.isEnabled = false
+            saveButton.alpha = 0.5
+            
+            // Create and show activity indicator
+            let indicator = UIActivityIndicatorView(style: .medium)
+            indicator.center = view.center
+            indicator.startAnimating()
+            view.addSubview(indicator)
+            activityIndicator = indicator
+        } else {
+            // Re-enable the save button
+            saveButton.isEnabled = true
+            saveButton.alpha = 1.0
+            
+            // Remove activity indicator
+            activityIndicator?.stopAnimating()
+            activityIndicator?.removeFromSuperview()
+            activityIndicator = nil
+        }
+    }
+    
+    private func showAlert(message: String, completion: (() -> Void)? = nil) {
         let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
+            completion?()
+        })
         present(alert, animated: true)
+    }
+    
+    private func showSuccessAlert(message: String) {
+        let alert = UIAlertController(
+            title: "Success!",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            // Navigate back to previous screen
+            self?.navigationController?.popViewController(animated: true)
+        })
+        present(alert, animated: true)
+    }
+    
+    private func handleNetworkError(_ error: NetworkError) {
+        switch error {
+        case .unauthorized:
+            showAlert(message: "Session expired. Please login again.") { [weak self] in
+                // Navigate to login
+                self?.navigationController?.popToRootViewController(animated: true)
+            }
+        case .noData, .decodingError:
+            showAlert(message: "Server error. Please try again.")
+        case .networkError:
+            showAlert(message: "Network connection error. Please check your internet.")
+        default:
+            showAlert(message: error.localizedDescription)
+        }
     }
 }
 
@@ -406,9 +578,15 @@ extension CreateSetViewController: UITableViewDataSource, UITableViewDelegate {
     }
 }
 
-// MARK: - Term Model
-struct Term {
-    var term: String
-    var definition: String
-}
-
+//// MARK: - UITextFieldDelegate
+//extension CreateSetViewController: UITextFieldDelegate {
+//    override func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+//        textField.resignFirstResponder()
+//        return true
+//    }
+//    
+//    override func textFieldDidEndEditing(_ textField: UITextField) {
+//        // Trim whitespace when user finishes editing
+//        textField.text = textField.text?.trimmingCharacters(in: .whitespacesAndNewlines)
+//    }
+//}
