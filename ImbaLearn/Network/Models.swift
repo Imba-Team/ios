@@ -27,13 +27,14 @@ struct UserProfileResponse: Codable {
 }
 
 struct UserProfileData: Codable {
-    let id: String  // Note: Changed from Int to String based on API response
+    let id: String
     let email: String
     let name: String
     let status: String?
     let role: String?
     let createdAt: String?
     let updatedAt: String?
+    let profilePicture: String?
     
     enum CodingKeys: String, CodingKey {
         case id
@@ -43,6 +44,30 @@ struct UserProfileData: Codable {
         case role
         case createdAt = "createdAt"
         case updatedAt = "updatedAt"
+        case profilePicture = "profilePicture"
+    }
+}
+
+// MARK: - User Info Model (for UI display)
+struct UserInfo: Codable {
+    let id: String
+    let name: String
+    let avatarUrl: String?
+    let isCurrentUser: Bool
+    
+    init(id: String, name: String, avatarUrl: String? = nil, isCurrentUser: Bool = false) {
+        self.id = id
+        self.name = name
+        self.avatarUrl = avatarUrl
+        self.isCurrentUser = isCurrentUser
+    }
+    
+    // Convenience initializer from UserProfileData
+    init(from profileData: UserProfileData, isCurrentUser: Bool = true) {
+        self.id = profileData.id
+        self.name = profileData.name
+        self.avatarUrl = profileData.profilePicture
+        self.isCurrentUser = isCurrentUser
     }
 }
 
@@ -124,6 +149,8 @@ struct ModuleResponse: Codable {
     }
 }
 
+
+
 struct CreateModuleResponse: Codable {
     let ok: Bool
     let message: String
@@ -163,14 +190,30 @@ struct TermResponse: Codable {
     let term: String
     let status: String
     let definition: String
-    let isStarred: Bool
+    var isStarred: Bool
     let createdAt: String?
     let updatedAt: String?
     let moduleId: String?  // optional since response might not have it
     
     enum CodingKeys: String, CodingKey {
-        case id, term, status, definition, isStarred, createdAt, updatedAt, moduleId
+        case id, term, status, definition, createdAt, updatedAt
+        case isStarred = "isStarred"
+        case moduleId = "moduleId"
+
     }
+}
+
+struct ResponseModel<T: Decodable>: Decodable {
+    let ok: Bool
+    let message: String
+    let data: T
+}
+
+//ResponseModel<TermResponse>.self
+
+struct PaginatedTermsData: Codable {
+    let data: [TermResponse]
+    let total: Int
 }
 
 struct CreateTermResponse: Codable {
@@ -183,7 +226,14 @@ struct CreateTermResponse: Codable {
 struct TermsListResponse: Codable {
     let ok: Bool
     let message: String
-    let data: [TermResponse]?
+    let data: PaginatedTermsData?
+}
+
+// MARK: - Update Term Response
+struct UpdateTermResponse: Codable {
+    let ok: Bool
+    let message: String
+    let data: TermResponse
 }
 
 // MARK: - Term Model (for local use in UI)

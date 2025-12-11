@@ -2,6 +2,7 @@ import UIKit
 
 class ModuleCell: UITableViewCell {
     
+    // MARK: - UI Elements
     private lazy var titleLabel: UILabel = {
         let label = UILabel()
         label.textColor = .black
@@ -47,6 +48,7 @@ class ModuleCell: UITableViewCell {
         return stack
     }()
     
+    // MARK: - Initialization
     override init(style: UITableViewCell.CellStyle, reuseIdentifier: String?) {
         super.init(style: style, reuseIdentifier: reuseIdentifier)
         setupUI()
@@ -57,6 +59,7 @@ class ModuleCell: UITableViewCell {
         fatalError("init(coder:) has not been implemented")
     }
     
+    // MARK: - Setup
     private func setupUI() {
         backgroundColor = .clear
         contentView.layer.cornerRadius = 12
@@ -79,15 +82,22 @@ class ModuleCell: UITableViewCell {
         ])
     }
     
-    func configure(with module: ModuleResponse, backgroundColor: UIColor) {
+    // MARK: - Configuration
+    func configure(with module: ModuleResponse, backgroundColor: UIColor, termsCount: Int? = nil) {
         titleLabel.text = module.title
         
-        // Use the progress data directly
-        let total = module.progress?.total ?? 0
-        cardCountLabel.text = "\(total) card\(total == 1 ? "" : "s")"
+        // Use the provided terms count or fall back to progress data
+        if let termsCount = termsCount, termsCount > 0 {
+            cardCountLabel.text = "\(termsCount) term\(termsCount == 1 ? "" : "s")"
+        } else {
+            // Fall back to progress data if no terms count provided
+            let total = module.progress?.total ?? 0
+            cardCountLabel.text = "\(total) term\(total == 1 ? "" : "s")"
+        }
         
         // Show lock icon for private modules
         privateIcon.isHidden = !module.isPrivate
+        
         contentView.backgroundColor = backgroundColor
     }
 }

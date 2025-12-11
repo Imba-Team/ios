@@ -123,3 +123,5 @@ class TermCell: UITableViewCell {
         definitionTextChanged?(trimmedText)
     }
 }
+
+

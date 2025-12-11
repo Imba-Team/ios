@@ -8,6 +8,7 @@ import Foundation
 
 // MARK: - Network Errors
 enum NetworkError: Error, LocalizedError {
+    
     case invalidURL
     case noData
     case decodingError(Error)
@@ -95,12 +96,22 @@ class NetworkManager {
     func request<T: Decodable>(
         endpoint: String,
         method: HTTPMethod = .post,
+        queryParameters: [String: String]? = nil,
         body: Data? = nil,
         requiresAuth: Bool = false,
         completion: @escaping (Result<T, NetworkError>) -> Void
     ) {
-        // Build URL
-        guard let url = URL(string: baseURL + endpoint) else {
+        // Build URL with query parameters
+        var urlComponents = URLComponents(string: baseURL + endpoint)
+        
+        if let queryParameters = queryParameters, !queryParameters.isEmpty {
+            urlComponents?.queryItems = queryParameters.map {
+                URLQueryItem(name: $0.key, value: $0.value)
+            }
+        }
+        
+        // Get the URL from urlComponents (which includes query parameters)
+        guard let url = urlComponents?.url else {
             completion(.failure(.invalidURL))
             return
         }
@@ -357,7 +368,29 @@ class NetworkManager {
     }
 
     func getModuleTerms(moduleId: String, completion: @escaping (Result<TermsListResponse, NetworkError>) -> Void) {
-        request(endpoint: "/modules/\(moduleId)/terms", method: .get, requiresAuth: true, completion: completion)
+        let queryParameters = ["moduleId": moduleId]
+        request(endpoint: "/terms", method: .get, queryParameters: queryParameters, requiresAuth: true, completion: completion)
+    }
+    
+    func updateTermFavorite(termId: String, isStarred: Bool, completion: @escaping (Result<TermResponse, NetworkError>) -> Void) {
+        let body = ["isStarred": isStarred]
+        
+        do {
+            let bodyData = try encoder.encode(body)
+            
+            // First decode as UpdateTermResponse, then extract the data
+            request(endpoint: "/terms/\(termId)", method: .patch, body: bodyData, requiresAuth: true) { (result: Result<UpdateTermResponse, NetworkError>) in
+                switch result {
+                case .success(let response):
+                    // Return only the term data from inside the response
+                    completion(.success(response.data))
+                case .failure(let error):
+                    completion(.failure(error))
+                }
+            }
+        } catch {
+            completion(.failure(.encodingError(error)))
+        }
     }
 
     // MARK: - Helper Methods

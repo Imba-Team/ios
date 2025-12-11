@@ -58,7 +58,6 @@ class CreateSetViewController: BaseViewController {
         textField.layer.cornerRadius = 12
         textField.layer.masksToBounds = true
         textField.translatesAutoresizingMaskIntoConstraints = false
-        
         let paddingView = UIView(frame: CGRect(x: 0, y: 0, width: 12, height: textField.frame.height))
         textField.leftView = paddingView
         textField.leftViewMode = .always

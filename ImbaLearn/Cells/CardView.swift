@@ -1,5 +1,5 @@
 //
-//  CardCell.swift
+//  CardView.swift
 //  ImbaLearn
 //
 //  Created by Leyla Aliyeva on 30.11.25.
@@ -9,6 +9,7 @@ import UIKit
 
 class CardView: UIView {
     
+    // MARK: - UI Elements
     private lazy var termLabel: UILabel = {
         let label = UILabel()
         label.textColor = .text
@@ -40,6 +41,7 @@ class CardView: UIView {
     
     private var isShowingTerm = true
     
+    // MARK: - Initialization
     override init(frame: CGRect) {
         super.init(frame: frame)
         setupUI()
@@ -50,6 +52,7 @@ class CardView: UIView {
         fatalError("init(coder:) has not been implemented")
     }
     
+    // MARK: - Setup
     private func setupUI() {
         backgroundColor = .white
         layer.cornerRadius = 20
@@ -83,12 +86,14 @@ class CardView: UIView {
         ])
     }
     
-    func configure(with termCard: TermCard) {
-        termLabel.text = termCard.term
-        definitionLabel.text = termCard.definition
-        updateFavoriteButton(isFavorited: termCard.isFavorited)
+    // MARK: - Configuration
+    func configure(term: String, definition: String, isFavorite: Bool) {
+        termLabel.text = term
+        definitionLabel.text = definition
+        updateFavoriteButton(isFavorited: isFavorite)
     }
     
+    // MARK: - UI Updates
     func updateFavoriteButton(isFavorited: Bool) {
         let imageName = isFavorited ? "star.fill" : "star"
         favoriteButton.setImage(UIImage(systemName: imageName), for: .normal)

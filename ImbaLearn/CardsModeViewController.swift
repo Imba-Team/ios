@@ -9,6 +9,10 @@ import UIKit
 
 class CardsModeViewController: BaseViewController {
     
+    // MARK: - Properties
+    var module: ModuleResponse?
+    var terms: [TermResponse] = []  // REAL API DATA
+    
     // MARK: - UI Elements
     private lazy var closeButton: UIButton = {
         let button = UIButton(type: .system)
@@ -21,7 +25,7 @@ class CardsModeViewController: BaseViewController {
     
     private lazy var progressLabel: UILabel = {
         let label = UILabel()
-        label.text = "1 / 25"
+        label.text = "1 / 0"
         label.textColor = .text
         label.font = .systemFont(ofSize: 16, weight: .medium)
         label.textAlignment = .center
@@ -48,21 +52,13 @@ class CardsModeViewController: BaseViewController {
         return card
     }()
     
-    // MARK: - Properties
+    // MARK: - Private Properties
     private var currentIndex: Int = 0 {
         didSet {
             updateProgressLabel()
             updateCards()
         }
     }
-    
-    private var terms: [TermCard] = [
-        TermCard(term: "Photosynthesis", definition: "The process by which green plants use sunlight to synthesize foods from carbon dioxide and water.", isFavorited: false),
-        TermCard(term: "Mitochondria", definition: "Organelles that generate most of the chemical energy needed to power the cell's biochemical reactions.", isFavorited: false),
-        TermCard(term: "DNA", definition: "Deoxyribonucleic acid, a self-replicating material present in nearly all living organisms.", isFavorited: false),
-        TermCard(term: "Cell Membrane", definition: "A biological membrane that separates the interior of all cells from the outside environment.", isFavorited: false),
-        TermCard(term: "Enzyme", definition: "A substance produced by a living organism that acts as a catalyst to bring about a specific biochemical reaction.", isFavorited: false)
-    ]
     
     private var panGesture: UIPanGestureRecognizer!
     
@@ -72,7 +68,14 @@ class CardsModeViewController: BaseViewController {
         setupUI()
         setupConstraints()
         setupGestures()
-        updateCards()
+        
+        // Load terms if module is provided but terms array is empty
+        if let module = module, terms.isEmpty {
+            loadTerms(for: module)
+        } else {
+            updateCards()
+            updateProgressLabel()
+        }
     }
     
     private func setupUI() {
@@ -131,6 +134,34 @@ class CardsModeViewController: BaseViewController {
         currentCardView.addGestureRecognizer(tapGesture)
     }
     
+    // MARK: - API Methods
+    private func loadTerms(for module: ModuleResponse) {
+        NetworkManager.shared.getModuleTerms(moduleId: module.id) { [weak self] result in
+            guard let self = self else { return }
+            
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let response):
+                    if response.ok {
+                      //  self.terms = response.data ?? []
+                        self.updateCards()
+                        self.updateProgressLabel()
+                    } else {
+                        print("Failed to load terms: \(response.message)")
+                    }
+                case .failure(let error):
+                    print("Error loading terms: \(error)")
+                }
+            }
+        }
+    }
+    
+    private func toggleFavorite(for termId: String, isFavorite: Bool) {
+        // TODO: Implement API call to update favorite status
+        print("Toggle favorite for term: \(termId) to \(isFavorite)")
+        // NetworkManager.shared.updateTermFavorite(termId: termId, isFavorite: isFavorite) { ... }
+    }
+    
     // MARK: - Actions
     @objc private func closeTapped() {
         dismiss(animated: true)
@@ -141,8 +172,50 @@ class CardsModeViewController: BaseViewController {
     }
     
     @objc private func favoriteTapped() {
-        terms[currentIndex].isFavorited.toggle()
-        currentCardView.updateFavoriteButton(isFavorited: terms[currentIndex].isFavorited)
+        guard currentIndex < terms.count else { return }
+        
+        let term = terms[currentIndex]
+        let newFavoriteStatus = !term.isStarred
+        
+        print("⭐ Cards mode: Toggling favorite for term: \(term.term) to \(newFavoriteStatus)")
+        
+        // Update locally first
+        terms[currentIndex].isStarred = newFavoriteStatus
+        
+        // Update UI immediately
+        currentCardView.updateFavoriteButton(isFavorited: newFavoriteStatus)
+        
+        // Call API to update on server
+        NetworkManager.shared.updateTermFavorite(termId: term.id, isStarred: newFavoriteStatus) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let updatedTerm):
+                    print("✅ Cards mode: Favorite updated successfully")
+                    // Update local data with server response
+                    if let currentIndex = self?.currentIndex {
+                        self?.terms[currentIndex] = updatedTerm
+                    }
+                    
+                case .failure(let error):
+                    print("❌ Cards mode: Failed to update favorite: \(error)")
+                    
+                    // Revert local change
+                    if let currentIndex = self?.currentIndex {
+                        self?.terms[currentIndex].isStarred = term.isStarred // Revert
+                        self?.currentCardView.updateFavoriteButton(isFavorited: term.isStarred)
+                        
+                        // Show error
+                        let alert = UIAlertController(
+                            title: "Error",
+                            message: "Failed to update favorite",
+                            preferredStyle: .alert
+                        )
+                        alert.addAction(UIAlertAction(title: "OK", style: .default))
+                        self?.present(alert, animated: true)
+                    }
+                }
+            }
+        }
     }
     
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
@@ -162,14 +235,14 @@ class CardsModeViewController: BaseViewController {
             if translation.x > 0 {
                 // Swiping right - show previous card
                 if currentIndex > 0 {
-                    nextCardView.configure(with: terms[currentIndex - 1])
+                    configureCardView(nextCardView, with: terms[currentIndex - 1])
                     nextCardView.alpha = min(abs(translation.x) / 100, 1.0)
                     nextCardView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
                 }
             } else {
                 // Swiping left - show next card
                 if currentIndex < terms.count - 1 {
-                    nextCardView.configure(with: terms[currentIndex + 1])
+                    configureCardView(nextCardView, with: terms[currentIndex + 1])
                     nextCardView.alpha = min(abs(translation.x) / 100, 1.0)
                     nextCardView.transform = CGAffineTransform(scaleX: 0.9, y: 0.9)
                 }
@@ -247,23 +320,31 @@ class CardsModeViewController: BaseViewController {
     }
     
     private func updateCards() {
-        currentCardView.configure(with: terms[currentIndex])
+        guard !terms.isEmpty, currentIndex < terms.count else {
+            // If no terms, show empty state
+            currentCardView.configure(term: "No terms", definition: "Add terms to this module to start studying", isFavorite: false)
+            currentCardView.favoriteButton.isHidden = true
+            return
+        }
+        
+        let term = terms[currentIndex]
+        configureCardView(currentCardView, with: term)
+        currentCardView.favoriteButton.isHidden = false
         currentCardView.favoriteButton.addTarget(self, action: #selector(favoriteTapped), for: .touchUpInside)
         
         // Prepare next card (if any)
         if currentIndex < terms.count - 1 {
-            nextCardView.configure(with: terms[currentIndex + 1])
+            configureCardView(nextCardView, with: terms[currentIndex + 1])
         } else if currentIndex > 0 {
-            nextCardView.configure(with: terms[currentIndex - 1])
+            configureCardView(nextCardView, with: terms[currentIndex - 1])
         }
     }
-}
-
-
-
-// MARK: - TermCard Model
-struct TermCard {
-    let term: String
-    let definition: String
-    var isFavorited: Bool
+    
+    private func configureCardView(_ cardView: CardView, with term: TermResponse) {
+        cardView.configure(
+            term: term.term,
+            definition: term.definition,
+            isFavorite: term.isStarred
+        )
+    }
 }

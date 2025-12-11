@@ -133,6 +133,7 @@ class LibraryViewController: BaseViewController {
     private var modules: [ModuleResponse] = []
     private var filteredModules: [ModuleResponse] = []
     private var isLoading = false
+    private var termsCountCache: [String: Int] = [:] // Cache for terms count
     
     private let cellColors: [UIColor] = [
         .color3.withAlphaComponent(0.6),
@@ -265,6 +266,9 @@ class LibraryViewController: BaseViewController {
                         
                         print("✅ Showing \(self.modules.count) user modules out of \(allModules.count) total")
                         
+                        // Load terms count for all modules
+                        self.loadTermsCountForAllModules()
+                        
                         self.updateFilteredData()
                         self.tableView.reloadData()
                         self.updateEmptyState()
@@ -306,6 +310,50 @@ class LibraryViewController: BaseViewController {
         refreshControl.endRefreshing()
         showError(message: message)
         updateEmptyState()
+    }
+    
+    private func loadTermsCountForAllModules() {
+        // Clear previous cache
+        termsCountCache.removeAll()
+        
+        // Load terms count for each module
+        for module in modules {
+            loadTermsCount(for: module) { [weak self] count in
+                guard let self = self else { return }
+                
+                DispatchQueue.main.async {
+                    // Cache the result
+                    self.termsCountCache[module.id] = count ?? 0
+                    
+                    // Find the index of this module in filteredModules
+                    if let index = self.filteredModules.firstIndex(where: { $0.id == module.id }) {
+                        let indexPath = IndexPath(row: 0, section: index)
+                        
+                        // Update the cell if it's visible
+                        if let cell = self.tableView.cellForRow(at: indexPath) as? ModuleCell {
+                            let backgroundColor = self.getColorForIndex(index)
+                            cell.configure(with: module, backgroundColor: backgroundColor, termsCount: count)
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    private func loadTermsCount(for module: ModuleResponse, completion: @escaping (Int?) -> Void) {
+        NetworkManager.shared.getModuleTerms(moduleId: module.id) { result in
+            switch result {
+            case .success(let response):
+                if response.ok {
+                    let termsCount = response.data?.data.count ?? 0
+                    completion(termsCount)
+                } else {
+                    completion(nil)
+                }
+            case .failure:
+                completion(nil)
+            }
+        }
     }
     
     // MARK: - Helper Methods
@@ -408,7 +456,11 @@ extension LibraryViewController: UITableViewDataSource, UITableViewDelegate {
         let module = filteredModules[indexPath.section]
         
         let backgroundColor = getColorForIndex(indexPath.section)
-        cell.configure(with: module, backgroundColor: backgroundColor)
+        
+        // Get cached terms count or use progress data as fallback
+        let termsCount = termsCountCache[module.id] ?? module.progress?.total ?? 0
+        
+        cell.configure(with: module, backgroundColor: backgroundColor, termsCount: termsCount)
         
         return cell
     }
@@ -430,20 +482,20 @@ extension LibraryViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         let module = filteredModules[indexPath.section]
-        print("Selected: \(module.title)")
         
-        // TODO: Navigate to module detail
-        // For now, show module info
-        let alert = UIAlertController(
-            title: module.title,
-            message: """
-            ID: \(module.id)
-            Description: \(module.description ?? "No description")
-            Private: \(module.isPrivate ? "Yes" : "No")
-            """,
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
+        print("🔍 Tapped module: \(module.title)")
+        
+        // Navigate to module detail
+        let detailVC = ModuleDetailViewController()
+        detailVC.module = module
+        
+        if let navController = navigationController {
+            navController.pushViewController(detailVC, animated: true)
+        } else if let parentNav = parent as? UINavigationController {
+            parentNav.pushViewController(detailVC, animated: true)
+        } else {
+            detailVC.modalPresentationStyle = .fullScreen
+            present(detailVC, animated: true)
+        }
     }
 }
