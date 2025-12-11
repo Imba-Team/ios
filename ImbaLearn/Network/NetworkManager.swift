@@ -392,6 +392,53 @@ class NetworkManager {
             completion(.failure(.encodingError(error)))
         }
     }
+    
+    // MARK: - Update Module
+    func updateModule(moduleId: String, request: UpdateModuleRequest, completion: @escaping (Result<CreateModuleResponse, NetworkError>) -> Void) {
+        do {
+            let customEncoder = JSONEncoder()
+            customEncoder.keyEncodingStrategy = .useDefaultKeys
+            customEncoder.outputFormatting = .prettyPrinted
+            
+            let bodyData = try customEncoder.encode(request)
+            
+            if let jsonString = String(data: bodyData, encoding: .utf8) {
+                print("📦 Sending module update request:")
+                print(jsonString)
+            }
+            
+            let endpoint = "/modules/\(moduleId)"
+            self.request(endpoint: endpoint, method: .patch, body: bodyData, requiresAuth: true, completion: completion)
+        } catch {
+            completion(.failure(.encodingError(error)))
+        }
+    }
+
+    // MARK: - Update Term
+    func updateTerm(termId: String, request: UpdateTermRequest, completion: @escaping (Result<UpdateTermResponse, NetworkError>) -> Void) {
+        do {
+            let customEncoder = JSONEncoder()
+            customEncoder.keyEncodingStrategy = .useDefaultKeys
+            customEncoder.outputFormatting = .prettyPrinted
+            
+            let bodyData = try customEncoder.encode(request)
+            
+            if let jsonString = String(data: bodyData, encoding: .utf8) {
+                print("📦 Sending term update request:")
+                print(jsonString)
+            }
+            
+            let endpoint = "/terms/\(termId)"
+            self.request(endpoint: endpoint, method: .patch, body: bodyData, requiresAuth: true, completion: completion)
+        } catch {
+            completion(.failure(.encodingError(error)))
+        }
+    }
+
+    // MARK: - Delete Term
+    func deleteTerm(termId: String, completion: @escaping (Result<AuthResponse, NetworkError>) -> Void) {
+        request(endpoint: "/terms/\(termId)", method: .delete, requiresAuth: true, completion: completion)
+    }
 
     // MARK: - Helper Methods
     private func parseErrorMessage(from data: Data) -> String {

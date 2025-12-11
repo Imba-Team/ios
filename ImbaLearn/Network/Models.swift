@@ -133,9 +133,9 @@ struct ProgressData: Codable {
 struct ModuleResponse: Codable {
     let id: String
     let slug: String
-    let title: String
-    let description: String?
-    let isPrivate: Bool
+    var title: String
+    var description: String?
+    var isPrivate: Bool
     let userId: String
     let progress: ProgressData?
     
@@ -163,6 +163,26 @@ struct UserModulesResponse: Codable {
     let data: [ModuleResponse]?
 }
 
+// MARK: - Update Module Request
+
+struct UpdateModuleRequest: Codable {
+    let title: String
+    let description: String?
+    let isPrivate: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case title
+        case description
+        case isPrivate
+    }
+    
+    init(title: String, description: String? = nil, isPrivate: Bool = false) {
+        self.title = title
+        self.description = description
+        self.isPrivate = isPrivate
+    }
+}
+
 // MARK: - Term/Flashcard Models (for adding terms to module)
 struct CreateTermRequest: Codable {
     let moduleId: String
@@ -187,9 +207,9 @@ struct CreateTermRequest: Codable {
 
 struct TermResponse: Codable {
     let id: String
-    let term: String
+    var term: String
     let status: String
-    let definition: String
+    var definition: String
     var isStarred: Bool
     let createdAt: String?
     let updatedAt: String?
@@ -200,6 +220,19 @@ struct TermResponse: Codable {
         case isStarred = "isStarred"
         case moduleId = "moduleId"
 
+    }
+}
+
+// MARK: - Update Term Request
+struct UpdateTermRequest: Codable {
+    let term: String
+    let definition: String
+    let isStarred: Bool
+    
+    enum CodingKeys: String, CodingKey {
+        case term
+        case definition
+        case isStarred
     }
 }
 

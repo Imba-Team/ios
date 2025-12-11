@@ -581,16 +581,26 @@ class ModuleDetailViewController: BaseViewController {
     }
     
     private func editModule() {
-        // TODO: Implement edit module
-        print("Edit module: \(module.title)")
+        let editVC = EditModuleViewController()
+        editVC.module = module
+        editVC.terms = terms
         
-        let alert = UIAlertController(
-            title: "Edit Module",
-            message: "Edit functionality coming soon",
-            preferredStyle: .alert
-        )
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
+        editVC.onModuleUpdated = { [weak self] updatedModule in
+            self?.module = updatedModule
+            self?.titleLabel.text = updatedModule.title
+        }
+        
+        editVC.onTermsUpdated = { [weak self] updatedTerms in
+            self?.terms = updatedTerms
+            self?.updateFilteredTerms()
+            self?.tableView.reloadData()
+            self?.updateTermsCountLabel()
+            self?.updateCardsModeButton()
+        }
+        
+        let navController = UINavigationController(rootViewController: editVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
     }
     
     private func deleteModule() {
