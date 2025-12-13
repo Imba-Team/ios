@@ -20,12 +20,13 @@ struct AuthResponse: Codable {
 }
 
 // For user profile response
+//typealias UserProfileResponse = ResponseModel<UserProfileData?>
+
 struct UserProfileResponse: Codable {
     let ok: Bool
     let message: String
     let data: UserProfileData
 }
-
 struct UserProfileData: Codable {
     let id: String
     let email: String
@@ -163,6 +164,14 @@ struct UserModulesResponse: Codable {
     let data: [ModuleResponse]?
 }
 
+
+
+
+//typealias CreateModuleResponse = ResponseModel<ModuleResponse?>
+//
+//typealias UserModulesResponse = ResponseModel<ModuleResponse?>
+
+
 // MARK: - Update Module Request
 
 struct UpdateModuleRequest: Codable {
@@ -242,6 +251,8 @@ struct ResponseModel<T: Decodable>: Decodable {
     let data: T
 }
 
+//typealias AuthResponse = ResponseModel<Void>
+
 //ResponseModel<TermResponse>.self
 
 struct PaginatedTermsData: Codable {
@@ -255,7 +266,12 @@ struct CreateTermResponse: Codable {
     let data: TermResponse?
 }
 
+
+// For creating a term
+//typealias CreateTermResponse = ResponseModel<TermResponse?>
+
 // For fetching terms from a module
+
 struct TermsListResponse: Codable {
     let ok: Bool
     let message: String
@@ -268,6 +284,12 @@ struct UpdateTermResponse: Codable {
     let message: String
     let data: TermResponse
 }
+//
+//typealias TermsListResponse = ResponseModel<PaginatedTermsData?>
+//
+//// For updating a term
+//typealias UpdateTermResponse = ResponseModel<TermResponse>
+//
 
 // MARK: - Term Model (for local use in UI)
 struct Term {
@@ -292,3 +314,34 @@ extension TermResponse {
         return Term(term: self.term, definition: self.definition)
     }
 }
+
+// MARK: - Extension to convert ModuleResponse to StudySet
+//extension ModuleResponse {
+//    func toStudySet() -> StudySet {
+////        let progressValue: Float
+////        if let progressData = self.progress {
+////            // Calculate overall progress as percentage of completed terms
+////            let total = progressData.notStarted + progressData.inProgress + progressData.completed
+////            if total > 0 {
+////                progressValue = Float(progressData.completed) / Float(total)
+////            } else {
+////                progressValue = 0
+////            }
+////        } else {
+////            progressValue = 0
+////        }
+//        
+//        let cardCount = self.progress?.total ?? self.termsCount ?? 0
+//        
+//        return StudySet(
+//            id: self.id,
+//            name: self.title,
+//            iconName: "text.book.closed", // You can customize this based on module type if needed
+//          //r  progress: progressValue,
+//            lastAccessed: nil, // You might want to store last accessed date separately
+//            isStarted: (self.progress?.completed ?? 0) > 0 || (self.progress?.inProgress ?? 0) > 0,
+//            cardCount: cardCount
+//        )
+//    }
+//}
+////

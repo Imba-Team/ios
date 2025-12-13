@@ -67,10 +67,10 @@ class AllModulesCell: UITableViewCell {
         
         NSLayoutConstraint.activate([
             // Container View - with padding
-            containerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
+            containerView.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 0.5),
             containerView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: horizontalPadding),
             containerView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -horizontalPadding),
-            containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -4),
+            containerView.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -0.5),
             
             // Icon Image View
             iconImageView.leadingAnchor.constraint(equalTo: containerView.leadingAnchor, constant: 16),
@@ -90,10 +90,18 @@ class AllModulesCell: UITableViewCell {
             cardsCountLabel.bottomAnchor.constraint(equalTo: containerView.bottomAnchor, constant: -20)
         ])
     }
-    
-    func configure(with studySet: StudySet) {
+    func configure(with module: ModuleResponse, termsCount: Int? = nil) {
+        
         iconImageView.image = UIImage(systemName: "text.book.closed")
-        nameLabel.text = studySet.name
-        cardsCountLabel.text = "\(studySet.cardCount) cards"
+
+        nameLabel.text = module.title
+        // Use the provided terms count or fall back to progress data
+        if let termsCount = termsCount, termsCount > 0 {
+            cardsCountLabel.text = "\(termsCount) term\(termsCount == 1 ? "" : "s")"
+        } else {
+            // Fall back to progress data if no terms count provided
+            let total = module.progress?.total ?? 0
+            cardsCountLabel.text = "\(total) term\(total == 1 ? "" : "s")"
+        }
     }
 }
