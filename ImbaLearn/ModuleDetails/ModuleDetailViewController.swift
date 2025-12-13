@@ -53,12 +53,14 @@ class ModuleDetailViewController: BaseViewController {
     
     private lazy var creatorAvatarImageView: UIImageView = {
         let imageView = UIImageView()
-        imageView.contentMode = .scaleAspectFill
-        imageView.layer.cornerRadius = 15
-        imageView.clipsToBounds = true
-        imageView.translatesAutoresizingMaskIntoConstraints = false
-        imageView.backgroundColor = .lightGray
-        return imageView
+            imageView.contentMode = .scaleAspectFill
+            imageView.layer.cornerRadius = 15
+            imageView.clipsToBounds = true
+            imageView.translatesAutoresizingMaskIntoConstraints = false
+            imageView.backgroundColor = .clear 
+            imageView.layer.borderWidth = 1
+            imageView.layer.borderColor = UIColor.lightGray.withAlphaComponent(0.3).cgColor
+            return imageView
     }()
     
     private lazy var creatorNameLabel: UILabel = {
@@ -460,17 +462,100 @@ class ModuleDetailViewController: BaseViewController {
         creatorNameLabel.text = "Created by \(creatorInfo.name)"
         
         // Set avatar image
-        if let avatarUrl = creatorInfo.avatarUrl, !avatarUrl.isEmpty {
-            // Load image from URL - you should implement image loading/caching here
-            // For now, use a placeholder
-            creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
-            creatorAvatarImageView.tintColor = creatorInfo.isCurrentUser ? .pinkButton : .gray
+        if let avatarUrl = creatorInfo.fullAvatarUrl {
+            loadProfileImage(from: avatarUrl, for: creatorInfo)
         } else {
-            // Use system icon
-            creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
-            creatorAvatarImageView.tintColor = creatorInfo.isCurrentUser ? .pinkButton : .gray
+            // Fallback to placeholder with first letter or system icon
+            setPlaceholderAvatar(for: creatorInfo)
         }
     }
+    
+    private func loadProfileImage(from url: URL, for creatorInfo: UserInfo) {
+        // Cache key for this specific creator
+        let cacheKey = "creator_\(creatorInfo.id)_avatar"
+        
+        // Check cache first
+        if let cachedImageData = UserDefaults.standard.data(forKey: cacheKey),
+           let cachedImage = UIImage(data: cachedImageData) {
+            creatorAvatarImageView.image = cachedImage
+            creatorAvatarImageView.tintColor = nil // Remove tint color when we have actual image
+            return
+        }
+        // Show placeholder while loading
+            setPlaceholderAvatar(for: creatorInfo)
+            
+            // Download image
+            URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+                guard let self = self else { return }
+                
+                if let error = error {
+                    print("❌ Error loading creator avatar: \(error)")
+                    DispatchQueue.main.async {
+                        self.setPlaceholderAvatar(for: creatorInfo)
+                    }
+                    return
+                }
+                
+                guard let data = data, let image = UIImage(data: data) else {
+                    print("❌ Invalid image data for creator avatar")
+                    DispatchQueue.main.async {
+                        self.setPlaceholderAvatar(for: creatorInfo)
+                    }
+                    return
+                }
+                
+                DispatchQueue.main.async {
+                    print("✅ Loaded creator avatar for: \(creatorInfo.name)")
+                    
+                    // Set the actual image
+                    self.creatorAvatarImageView.image = image
+                    self.creatorAvatarImageView.tintColor = nil // Remove tint color
+                    
+                    // Cache the image
+                    if let imageData = image.jpegData(compressionQuality: 0.8) {
+                        UserDefaults.standard.set(imageData, forKey: cacheKey)
+                        UserDefaults.standard.synchronize()
+                    }
+                }
+            }.resume()
+        }
+    
+    private func setPlaceholderAvatar(for creatorInfo: UserInfo) {
+        // Use system icon or first letter as fallback
+        if creatorInfo.isCurrentUser {
+            // For current user, use pink system icon
+            creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
+            creatorAvatarImageView.tintColor = .pinkButton
+        } else {
+            // For other users, try to show first letter or generic icon
+            if let firstLetter = creatorInfo.name.first {
+                // Create a label-based avatar
+                let label = UILabel()
+                label.text = String(firstLetter).uppercased()
+                label.textAlignment = .center
+                label.font = .systemFont(ofSize: 12, weight: .bold)
+                label.textColor = .white
+                label.backgroundColor = .gray
+                label.frame = CGRect(x: 0, y: 0, width: 30, height: 30)
+                label.layer.cornerRadius = 15
+                label.layer.masksToBounds = true
+                
+                // Convert label to image
+                UIGraphicsBeginImageContextWithOptions(label.bounds.size, false, 0.0)
+                label.layer.render(in: UIGraphicsGetCurrentContext()!)
+                let image = UIGraphicsGetImageFromCurrentImageContext()
+                UIGraphicsEndImageContext()
+                
+                creatorAvatarImageView.image = image
+                creatorAvatarImageView.tintColor = nil
+            } else {
+                // Fallback to generic icon
+                creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
+                creatorAvatarImageView.tintColor = .gray
+            }
+        }
+    }
+
     
     private func updateFilteredTerms() {
         if showOnlyFavorites {
