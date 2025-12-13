@@ -1,13 +1,10 @@
-//
-//  AccountViewController.swift
-//  ImbaLearn
-//
-//  Created by Leyla Aliyeva on 17.11.25.
-//
-
 import UIKit
+import PhotosUI
 
 class AccountViewController: BaseViewController {
+    
+    // MARK: - Properties
+    private var viewModel = AccountViewModel()
     
     // MARK: - UI Elements
     private lazy var scrollView: UIScrollView = {
@@ -31,16 +28,25 @@ class AccountViewController: BaseViewController {
     
     private lazy var avatarCircle: UIView = {
         let view = UIView()
-        view.backgroundColor = .color
         view.layer.cornerRadius = 40
         view.layer.masksToBounds = true
         view.translatesAutoresizingMaskIntoConstraints = false
         return view
     }()
     
+    private lazy var avatarImageView: UIImageView = {
+        let imageView = UIImageView()
+        imageView.contentMode = .scaleAspectFill
+        imageView.layer.cornerRadius = 40
+        imageView.layer.masksToBounds = true
+        imageView.isUserInteractionEnabled = true
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        return imageView
+    }()
+    
     private lazy var avatarLabel: UILabel = {
         let label = UILabel()
-        label.text = "?" // Will be updated with user's first letter
+        label.text = "?"
         label.textColor = .darkGray
         label.font = .systemFont(ofSize: 32, weight: .bold)
         label.textAlignment = .center
@@ -48,28 +54,47 @@ class AccountViewController: BaseViewController {
         return label
     }()
     
-    private lazy var userInfoStack: UIStackView = {
-        let stack = UIStackView()
-        stack.axis = .vertical
-        stack.spacing = 4
-        stack.alignment = .leading
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        return stack
+    private lazy var editAvatarButton: UIButton = {
+        let button = UIButton(type: .system)
+        let config = UIImage.SymbolConfiguration(pointSize: 16, weight: .bold)
+        let image = UIImage(systemName: "pencil.circle.fill", withConfiguration: config)
+        button.setImage(image, for: .normal)
+        button.tintColor = .pinkButton
+        button.backgroundColor = .white
+        button.layer.cornerRadius = 14
+        button.layer.borderWidth = 2
+        button.layer.borderColor = UIColor.background.cgColor
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.addTarget(self, action: #selector(editAvatarTapped), for: .touchUpInside)
+        return button
     }()
     
+//    private lazy var userInfoStack: UIStackView = {
+//        let stack = UIStackView()
+//        stack.axis = .vertical
+//        stack.spacing = 4
+//        stack.alignment = .leading
+//        stack.translatesAutoresizingMaskIntoConstraints = false
+//        return stack
+//    }()
+//    
     private lazy var nameLabel: UILabel = {
         let label = UILabel()
         label.text = "Loading..."
         label.textColor = .black
         label.font = .systemFont(ofSize: 20, weight: .bold)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
-    
+
     private lazy var emailLabel: UILabel = {
         let label = UILabel()
         label.text = "loading..."
         label.textColor = .gray
         label.font = .systemFont(ofSize: 16, weight: .regular)
+        label.textAlignment = .center
+        label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
     
@@ -191,54 +216,49 @@ class AccountViewController: BaseViewController {
         return button
     }()
     
-    // MARK: - Properties
-    private var currentUser: User?
-    
     // MARK: - Lifecycle
-    override func viewDidLoad() {
-        super.viewDidLoad()
-        setupUI()
-        setupConstraints()
-        setupTextFields()
-        loadUserData()
-    }
+        override func viewDidLoad() {
+            super.viewDidLoad()
+            setupUI()
+            setupConstraints()
+          //  setupTextFields()
+            setupViewModelCallbacks()
+            setupAvatarGesture()
+            viewModel.loadUserData()
+        }
     
     override func viewWillAppear(_ animated: Bool) {
-        super.viewWillAppear(animated)
-        // Refresh user data when view appears
-        loadUserData()
-    }
-    
-    private func setupUI() {
-        view.backgroundColor = .background
-        title = "Account"
-        
-        // Add scroll view and content view
-        view.addSubview(scrollView)
-        scrollView.addSubview(contentView)
-        
-        // Add avatar and user info
-        avatarContainer.addSubview(avatarCircle)
-        avatarCircle.addSubview(avatarLabel)
-        
-        userInfoStack.addArrangedSubview(nameLabel)
-        userInfoStack.addArrangedSubview(emailLabel)
-        
-        // Add all elements to content view
-        contentView.addSubviews(avatarContainer, userInfoStack, nameFieldLabel, nameTextField, emailFieldLabel, emailTextField, passwordLabel, passwordTextField, changePasswordButton, logoutButton, deleteAccountButton)
-    }
-    
-    private func setupTextFields() {
-        // Set up text field delegates
-        let textFields = [nameTextField, emailTextField]
-        textFields.forEach { textField in
-            textField.delegate = self
+            super.viewWillAppear(animated)
+            // Refresh user data when view appears
+            viewModel.loadUserData()
         }
         
-        // Enable keyboard avoidance
-        setupKeyboardAvoidance(with: scrollView)
-    }
-    
+        private func setupUI() {
+            view.backgroundColor = .background
+            title = "Account"
+            
+            // Add scroll view and content view
+            view.addSubview(scrollView)
+            scrollView.addSubview(contentView)
+            
+            // Add avatar and user info
+            avatarContainer.addSubview(avatarCircle)
+            avatarCircle.addSubview(avatarImageView)
+            avatarCircle.addSubview(avatarLabel)
+            avatarContainer.addSubview(editAvatarButton)
+            
+            contentView.addSubviews(nameLabel, emailLabel)
+
+            
+            // Add all elements to content view
+            contentView.addSubviews(avatarContainer, nameFieldLabel, nameTextField, emailFieldLabel, emailTextField, passwordLabel, passwordTextField, changePasswordButton, logoutButton, deleteAccountButton)
+        }
+        
+        private func setupAvatarGesture() {
+            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(editAvatarTapped))
+            avatarImageView.addGestureRecognizer(tapGesture)
+        }
+        
     private func setupConstraints() {
         let padding: CGFloat = 20
         let fieldHeight: CGFloat = 50
@@ -261,7 +281,7 @@ class AccountViewController: BaseViewController {
             
             // Avatar Container
             avatarContainer.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 30),
-            avatarContainer.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
+            avatarContainer.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
             avatarContainer.widthAnchor.constraint(equalToConstant: 80),
             avatarContainer.heightAnchor.constraint(equalToConstant: 80),
             
@@ -271,17 +291,43 @@ class AccountViewController: BaseViewController {
             avatarCircle.widthAnchor.constraint(equalToConstant: 80),
             avatarCircle.heightAnchor.constraint(equalToConstant: 80),
             
+            // Avatar Image View
+            avatarImageView.centerXAnchor.constraint(equalTo: avatarCircle.centerXAnchor),
+            avatarImageView.centerYAnchor.constraint(equalTo: avatarCircle.centerYAnchor),
+            avatarImageView.widthAnchor.constraint(equalTo: avatarCircle.widthAnchor),
+            avatarImageView.heightAnchor.constraint(equalTo: avatarCircle.heightAnchor),
+            
             // Avatar Label
             avatarLabel.centerXAnchor.constraint(equalTo: avatarCircle.centerXAnchor),
             avatarLabel.centerYAnchor.constraint(equalTo: avatarCircle.centerYAnchor),
             
-            // User Info Stack
-            userInfoStack.leadingAnchor.constraint(equalTo: avatarContainer.trailingAnchor, constant: 16),
-            userInfoStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            userInfoStack.centerYAnchor.constraint(equalTo: avatarContainer.centerYAnchor),
+            // Edit Avatar Button
+            editAvatarButton.trailingAnchor.constraint(equalTo: avatarContainer.trailingAnchor, constant: -2),
+            editAvatarButton.bottomAnchor.constraint(equalTo: avatarContainer.bottomAnchor, constant: -2),
+            editAvatarButton.widthAnchor.constraint(equalToConstant: 28),
+            editAvatarButton.heightAnchor.constraint(equalToConstant: 28),
             
+            nameLabel.topAnchor.constraint(equalTo: avatarContainer.bottomAnchor, constant: 16),
+                    nameLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+                    nameLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: padding),
+                    nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding),
+                    
+                    // Email Label - centered below name
+                    emailLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
+                    emailLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+                    emailLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: padding),
+                    emailLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding),
+    
+            
+            // User Info Stack - FIXED: Align to center like avatar
+//            userInfoStack.topAnchor.constraint(equalTo: avatarContainer.bottomAnchor, constant: 16),
+//            userInfoStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+//            userInfoStack.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: padding),
+//            userInfoStack.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding),
+//            
             // Name Field Label
-            nameFieldLabel.topAnchor.constraint(equalTo: avatarContainer.bottomAnchor, constant: 40),
+            nameFieldLabel.topAnchor.constraint(equalTo: emailLabel.bottomAnchor, constant: 40),
+
             nameFieldLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             nameFieldLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             nameFieldLabel.heightAnchor.constraint(equalToConstant: labelHeight),
@@ -335,124 +381,94 @@ class AccountViewController: BaseViewController {
         ])
     }
     
-    // MARK: - Load User Data
-    private func loadUserData() {
-        // First try to load from saved data
-        if let savedUserData = UserDefaults.standard.data(forKey: "currentUser"),
-           let savedUser = try? JSONDecoder().decode(User.self, from: savedUserData) {
-            updateUI(with: savedUser)
-            print("✅ Loaded user from saved data: \(savedUser.name)")
-        } else {
-            // If no saved data, fetch from API
-            fetchUserProfile()
+    private func setupViewModelCallbacks() {
+            viewModel.onUserDataUpdated = { [weak self] user in
+                self?.updateUI(with: user)
+            }
+            
+            viewModel.onProfileImageUpdated = { [weak self] image in
+                self?.updateProfileImage(image)
+            }
+            
+            viewModel.onError = { [weak self] message in
+                self?.showError(message: message)
+            }
+            
+            viewModel.onLogoutSuccess = { [weak self] in
+                self?.navigateToAuthentication()
+            }
+            
+            viewModel.onAccountDeleteSuccess = { [weak self] in
+                let alert = UIAlertController(
+                    title: "Account Deleted",
+                    message: "Your account has been successfully deleted.",
+                    preferredStyle: .alert
+                )
+                alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+                    self?.navigateToAuthentication()
+                })
+                self?.present(alert, animated: true)
+            }
         }
-    }
-
-    private func fetchUserProfile() {
-        print("🔍 Fetching user profile from API...")
         
-        showLoading()
-        
-        NetworkManager.shared.getUserProfile { [weak self] result in
-            DispatchQueue.main.async {
-                self?.hideLoading()
+    
+    // MARK: - UI Updates
+    private func updateUI(with user: User?) {
+            if let user = user {
+                // Update labels
+                nameLabel.text = user.name
+                emailLabel.text = user.email
                 
-                switch result {
-                case .success(let response):
-                    if response.ok {
-                        let profileData = response.data
-                        let user = User(from: profileData)
-                        
-                        // Update UI with real user data
-                        self?.updateUI(with: user)
-                        
-                        // Save to UserDefaults for future use
-                        self?.saveUserToDefaults(user)
-                        
-                        print("✅ Loaded user from API: \(user.name) (\(user.email))")
-                    } else {
-                        print("⚠️ Profile API returned error: \(response.message)")
-                        self?.loadUserDataFromSaved()
-                    }
-                    
-                case .failure(let error):
-                    print("❌ Failed to fetch profile: \(error.localizedDescription)")
-                    self?.loadUserDataFromSaved()
+                // Update text fields
+                nameTextField.text = user.name
+                emailTextField.text = user.email
+                
+                // Update avatar
+                updateAvatar(for: user.name)
+            } else {
+                // Show placeholder data
+                avatarLabel.text = "?"
+                nameLabel.text = "Not logged in"
+                emailLabel.text = "Please login"
+                nameTextField.text = ""
+                emailTextField.text = ""
+                avatarImageView.image = nil
+                avatarLabel.isHidden = false
+                avatarCircle.backgroundColor = .lightGray
+            }
+        }
+        
+        private func updateAvatar(for name: String) {
+            // Show label if no image, hide if image exists
+            avatarLabel.text = viewModel.getAvatarFirstLetter(for: name)
+            avatarLabel.isHidden = (viewModel.profileImage != nil)
+            avatarCircle.backgroundColor = viewModel.getAvatarColor(for: name)
+        }
+        
+        private func updateProfileImage(_ image: UIImage?) {
+            if let image = image {
+                avatarImageView.image = image
+                avatarLabel.isHidden = true
+                avatarCircle.backgroundColor = .clear
+            } else {
+                avatarImageView.image = nil
+                avatarLabel.isHidden = false
+                if let user = viewModel.currentUser {
+                    updateAvatar(for: user.name)
                 }
             }
         }
-    }
-
-    private func saveUserToDefaults(_ user: User) {
-        do {
-            let encoder = JSONEncoder()
-            let userData = try encoder.encode(user)
-            UserDefaults.standard.set(userData, forKey: "currentUser")
-            UserDefaults.standard.synchronize()
-            print("✅ User saved to UserDefaults: \(user.name)")
-        } catch {
-            print("❌ Failed to save user: \(error)")
-        }
-    }
-
-    private func loadUserDataFromSaved() {
-        // Try to load from saved data
-        if let savedUserData = UserDefaults.standard.data(forKey: "currentUser"),
-           let savedUser = try? JSONDecoder().decode(User.self, from: savedUserData) {
-            updateUI(with: savedUser)
-            print("✅ Loaded user from saved data: \(savedUser.name)")
-        } else {
-            // Show placeholder data
-            updateUI(with: nil)
-            print("⚠️ No user data found")
-        }
-    }
-    
-    private func updateUI(with user: User?) {
-        currentUser = user
         
-        if let user = user {
-            // Update avatar with first letter of name
-            if let firstLetter = user.name.first {
-                avatarLabel.text = String(firstLetter).uppercased()
-            } else {
-                avatarLabel.text = "?"
-            }
-            
-            // Update labels
-            nameLabel.text = user.name
-            emailLabel.text = user.email
-            
-            // Update text fields
-            nameTextField.text = user.name
-            emailTextField.text = user.email
-            
-            // Update avatar color based on first letter
-            updateAvatarColor(for: user.name)
-        } else {
-            // Show placeholder data
-            avatarLabel.text = "?"
-            nameLabel.text = "Not logged in"
-            emailLabel.text = "Please login"
-            nameTextField.text = ""
-            emailTextField.text = ""
-            avatarCircle.backgroundColor = .lightGray
-        }
+        // MARK: - Actions
+    @objc private func editAvatarTapped() {
+        let pickerVC = ProfileImagePickerViewController()
+        pickerVC.delegate = self
+        pickerVC.hasExistingPhoto = (viewModel.profileImage != nil) // Pass whether user has photo
+        pickerVC.modalPresentationStyle = .overFullScreen
+        pickerVC.modalTransitionStyle = .crossDissolve
+        present(pickerVC, animated: true)
     }
     
-    private func updateAvatarColor(for name: String) {
-        // Generate a consistent color based on the name
-        let colors: [UIColor] = [
-            .systemBlue, .systemGreen, .systemOrange, .systemPurple,
-            .systemPink, .systemTeal, .systemIndigo, .systemBrown
-        ]
-        
-        let hash = name.utf8.reduce(0) { $0 + Int($1) }
-        let colorIndex = hash % colors.count
-        avatarCircle.backgroundColor = colors[colorIndex]
-    }
-    
-    // MARK: - Actions
     @objc private func changePasswordTapped() {
         print("Change password tapped - attempting to navigate...")
         
@@ -478,7 +494,7 @@ class AccountViewController: BaseViewController {
                                     preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Logout", style: .destructive) { [weak self] _ in
-            self?.performLogout()
+            self?.viewModel.performLogout()
         })
         present(alert, animated: true)
     }
@@ -489,102 +505,38 @@ class AccountViewController: BaseViewController {
                                     preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
-            self?.performAccountDeletion()
+            self?.viewModel.performAccountDeletion()
         })
         present(alert, animated: true)
     }
     
-    // MARK: - Logout Implementation
-    private func performLogout() {
-        showLoading()
-        
-        // Call logout API if available
-        NetworkManager.shared.logout { [weak self] result in
-            DispatchQueue.main.async {
-                self?.hideLoading()
-                
-                switch result {
-                case .success(let response):
-                    print("✅ Logout successful: \(response.message)")
-                case .failure(let error):
-                    print("⚠️ Logout API error: \(error.localizedDescription)")
-                    // We'll still clear local data even if API fails
-                }
-                
-                // Clear all local data
-                self?.clearLocalData()
-                
-                // Navigate to authentication
-                self?.navigateToAuthentication()
-            }
-        }
-    }
-    
-    private func clearLocalData() {
-        // Clear token from NetworkManager
-        NetworkManager.shared.authToken = nil
-        
-        // Clear all user data from UserDefaults
-        UserDefaults.standard.removeObject(forKey: "authToken")
-        UserDefaults.standard.removeObject(forKey: "currentUser")
-        UserDefaults.standard.synchronize()
-        
-        // Clear cookies
-        HTTPCookieStorage.shared.removeCookies(since: Date.distantPast)
-        
-        print("✅ All local data cleared")
-    }
-    
+    // MARK: - Navigation
     private func navigateToAuthentication() {
         if let sceneDelegate = UIApplication.shared.connectedScenes.first?.delegate as? SceneDelegate {
             sceneDelegate.showAuthentication(animated: true)
         }
     }
     
-    // MARK: - Account Deletion (Placeholder)
-    private func performAccountDeletion() {
-        // TODO: Implement actual account deletion API call
-        showLoading()
-        
-        // For now, just simulate deletion and logout
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            self?.hideLoading()
-            
-            let alert = UIAlertController(
-                title: "Account Deleted",
-                message: "Your account has been successfully deleted.",
-                preferredStyle: .alert
-            )
-            alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
-                // Clear data and logout
-                self?.clearLocalData()
-                self?.navigateToAuthentication()
-            })
-            self?.present(alert, animated: true)
-        }
-    }
-    
     // MARK: - Helper Methods
-    private func showLoading() {
-        let loadingView = UIView(frame: view.bounds)
-        loadingView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
-        loadingView.tag = 999
-        
-        let activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.center = loadingView.center
-        activityIndicator.startAnimating()
-        loadingView.addSubview(activityIndicator)
-        
-        view.addSubview(loadingView)
-        view.isUserInteractionEnabled = false
-    }
-    
-    private func hideLoading() {
-        view.subviews.forEach { subview in
-            if subview.tag == 999 {
-                subview.removeFromSuperview()
-            }
-        }
-        view.isUserInteractionEnabled = true
+    private func showError(message: String) {
+        let alert = UIAlertController(
+            title: "Error",
+            message: message,
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 }
+
+// MARK: - ProfileImagePickerDelegate
+extension AccountViewController: ProfileImagePickerDelegate {
+    func didSelectImage(_ image: UIImage) {
+        viewModel.setProfileImage(image)
+    }
+    
+    func didRemoveImage() {
+        viewModel.removeProfileImage()
+    }
+}
+

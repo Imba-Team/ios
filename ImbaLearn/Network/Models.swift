@@ -56,6 +56,18 @@ struct UserInfo: Codable {
     let avatarUrl: String?
     let isCurrentUser: Bool
     
+    var fullAvatarUrl: URL? {
+        guard let avatarUrl = avatarUrl, !avatarUrl.isEmpty else { return nil }
+        
+        // If it's already a full URL, return it
+        if avatarUrl.hasPrefix("http") {
+            return URL(string: avatarUrl)
+        }
+        
+        // If it's a relative path, construct the full URL
+        return URL(string: "https://imba-server.up.railway.app" + avatarUrl)
+    }
+    
     init(id: String, name: String, avatarUrl: String? = nil, isCurrentUser: Bool = false) {
         self.id = id
         self.name = name
@@ -77,6 +89,7 @@ struct User: Codable {
     let id: String
     let name: String
     let email: String
+    var profilePicture: String?
     let createdAt: String?
     let updatedAt: String?
     
@@ -85,6 +98,7 @@ struct User: Codable {
         self.id = profileData.id
         self.name = profileData.name
         self.email = profileData.email
+        self.profilePicture = profileData.profilePicture
         self.createdAt = profileData.createdAt
         self.updatedAt = profileData.updatedAt
     }

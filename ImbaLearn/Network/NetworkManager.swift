@@ -5,6 +5,7 @@
 //  Created by Leyla Aliyeva on 01.12.25.
 //
 import Foundation
+import UIKit
 
 // MARK: - Network Manager
 class NetworkManager {
@@ -252,6 +253,117 @@ class NetworkManager {
     // Delete Account
     func deleteAccount(completion: @escaping (Result<AuthResponse, NetworkError>) -> Void) {
         request(endpoint: "/users/me", method: .delete, requiresAuth: true, completion: completion)
+    }
+    
+    // upload profile picture
+    func uploadProfilePicture(image: UIImage, completion: @escaping (Result<UserProfileResponse, NetworkError>) -> Void) {
+        guard let url = URL(string: baseURL + "/users/me/profile-picture") else {
+            completion(.failure(.invalidURL))
+            return
+        }
+        
+        print("📸 Uploading profile picture to: \(url.absoluteString)")
+        print("📸 Image size: \(image.size)")
+        
+        var request = URLRequest(url: url)
+        request.httpMethod = "PATCH"
+        
+        // Set authorization header
+        if let token = authToken {
+            request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+            print("📸 Using auth token")
+        } else {
+            print("⚠️ No auth token available")
+        }
+        
+        // Create multipart form data
+        let boundary = UUID().uuidString
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        
+        guard let imageData = image.jpegData(compressionQuality: 0.8) else {
+            print("❌ Failed to convert image to JPEG")
+            completion(.failure(.encodingError(NSError(domain: "", code: 0, userInfo: [NSLocalizedDescriptionKey: "Failed to convert image"]))))
+            return
+        }
+        
+        print("📸 Image data size: \(imageData.count) bytes")
+        
+        var body = Data()
+        
+        // Add file data
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"file\"; filename=\"profile.jpg\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: image/jpeg\r\n\r\n".data(using: .utf8)!)
+        body.append(imageData)
+        body.append("\r\n".data(using: .utf8)!)
+        
+        // End boundary
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+        
+        request.httpBody = body
+        
+        logRequest(request)
+        
+        session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                print("❌ Network error: \(error)")
+                DispatchQueue.main.async {
+                    completion(.failure(.networkError(error)))
+                }
+                return
+            }
+            
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("❌ No HTTP response")
+                DispatchQueue.main.async {
+                    completion(.failure(.unknown))
+                }
+                return
+            }
+            
+            print("📸 Response status code: \(httpResponse.statusCode)")
+            
+            self.logResponse(httpResponse, data: data)
+            
+            guard let data = data else {
+                print("❌ No response data")
+                DispatchQueue.main.async {
+                    completion(.failure(.noData))
+                }
+                return
+            }
+            
+            // Print raw response for debugging
+            if let responseString = String(data: data, encoding: .utf8) {
+                print("📸 Raw response: \(responseString)")
+            }
+            
+            do {
+                let decodedData = try self.decoder.decode(UserProfileResponse.self, from: data)
+                print("✅ Successfully decoded response")
+                print("📸 Profile picture in response: \(decodedData.data.profilePicture ?? "nil")")
+                
+                DispatchQueue.main.async {
+                    completion(.success(decodedData))
+                }
+            } catch {
+                print("❌ Decoding error: \(error)")
+                print("❌ Error details: \(error.localizedDescription)")
+                
+                // Try to decode as error response
+                if let errorResponse = try? self.decoder.decode(ErrorResponse.self, from: data) {
+                    print("❌ Error message: \(errorResponse.message ?? "No message")")
+                }
+                
+                DispatchQueue.main.async {
+                    completion(.failure(.decodingError(error)))
+                }
+            }
+        }.resume()
+    }
+
+    func deleteProfilePicture(completion: @escaping (Result<UserProfileResponse, NetworkError>) -> Void) {
+        request(endpoint: "/users/me/profile-picture", method: .delete, requiresAuth: true, completion: completion)
     }
     
     // MARK: - Module Methods
