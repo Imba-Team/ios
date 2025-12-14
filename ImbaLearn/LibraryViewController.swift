@@ -255,11 +255,27 @@ class LibraryViewController: BaseViewController {
                     if response.ok {
                         // Filter modules to show only the ones created by current user
                         let allModules = response.data ?? []
+                        
+                        // DEBUG: Log all modules and user IDs
+                        print("🔍 DEBUG: All modules received: \(allModules.count)")
+                        for (index, module) in allModules.enumerated() {
+                            print("Module \(index): \(module.title)")
+                            print("  - Module userId: \(module.userId)")
+                            print("  - Current userId: \(userId)")
+                            print("  - Match: \(module.userId == userId)")
+                        }
+                        
                         self.modules = allModules.filter { module in
                             module.userId == userId
                         }
                         
                         print("✅ Showing \(self.modules.count) user modules out of \(allModules.count) total")
+                        
+                        // If no modules after filtering, maybe show all?
+                        if self.modules.isEmpty && !allModules.isEmpty {
+                            print("⚠️ WARNING: Filtered out all modules! Showing all modules instead.")
+                            self.modules = allModules
+                        }
                         
                         // Load terms count for all modules
                         self.loadTermsCountForAllModules()

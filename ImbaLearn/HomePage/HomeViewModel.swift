@@ -3,54 +3,62 @@ import Foundation
 class HomeViewModel {
     
     // MARK: - Properties
-    private(set) var continueLearningSets: [ModuleResponse] = []
-    private(set) var allModules: [ModuleResponse] = []
-    private(set) var isLoading = false
-    private var termsCountCache: [String: Int] = [:] // Cache for terms count
-    
-    // MARK: - Callbacks
-    var onDataUpdated: (() -> Void)?
-    var onError: ((String) -> Void)?
-    var onNavigateToModuleDetail: ((ModuleResponse) -> Void)?
-    
-    // MARK: - Data Methods
-    func loadModules() {
-        guard !isLoading else { return }
+        private(set) var continueLearningSets: [ModuleResponse] = []
+        private(set) var allModules: [ModuleResponse] = []
+        private(set) var isLoading = false
+        private var termsCountCache: [String: Int] = [:]
         
-        isLoading = true
+        // MARK: - Callbacks
+        var onDataUpdated: (() -> Void)?
+        var onError: ((String) -> Void)?
+        var onNavigateToModuleDetail: ((ModuleResponse) -> Void)?
         
-        NetworkManager.shared.getUserModules { [weak self] result in
-            guard let self = self else { return }
+        // MARK: - Data Methods
+        func loadModules() {
+            guard !isLoading else { return }
             
-            DispatchQueue.main.async {
-                self.isLoading = false
+            isLoading = true
+            
+            NetworkManager.shared.getUserModules { [weak self] result in
+                guard let self = self else { return }
                 
-                switch result {
-                case .success(let response):
-                    if response.ok {
-                        self.processModules(response.data ?? [])
-                    } else {
-                        self.onError?(response.message)
-                    }
+                DispatchQueue.main.async {
+                    self.isLoading = false
                     
-                case .failure(let error):
-                    self.onError?(error.localizedDescription)
+                    switch result {
+                    case .success(let response):
+                        if response.ok {
+                            self.processModules(response.data ?? [])
+                        } else {
+                            // Even if API says OK but returns empty data
+                            self.processModules([])
+                            self.onError?(response.message)
+                        }
+                        
+                    case .failure(let error):
+                        // On network error, still update UI to show empty state
+                        self.processModules([])
+                        self.onError?(error.localizedDescription)
+                    }
                 }
             }
         }
-    }
-    
-    private func processModules(_ modules: [ModuleResponse]) {
-        // Clear previous cache
-        termsCountCache.removeAll()
         
-        // All modules
-        allModules = modules
-        
-        // For Continue Learning, show modules that are started (has progress > 0)
-        if modules.isEmpty {
-            continueLearningSets = []
-        } else {
+        private func processModules(_ modules: [ModuleResponse]) {
+            // Clear previous cache
+            termsCountCache.removeAll()
+            
+            // All modules
+            allModules = modules
+            
+            if modules.isEmpty {
+                continueLearningSets = []
+                // Don't load terms count if no modules
+                self.onDataUpdated?()
+                return
+            }
+            
+            // For Continue Learning, show modules that are started (has progress > 0)
             let modulesStarted = modules.filter { ($0.progress?.completed ?? 0) > 0 }
             
             if !modulesStarted.isEmpty {
@@ -59,28 +67,39 @@ class HomeViewModel {
                 let randomModules = modules.shuffled().prefix(3)
                 continueLearningSets = Array(randomModules)
             }
+            
+            // Load terms count for all modules
+            loadTermsCountForAllModules()
         }
         
-        // Load terms count for all modules (similar to Library)
-        loadTermsCountForAllModules()
-    }
-    
-    private func loadTermsCountForAllModules() {
-        // Load terms count for each module
-        for module in allModules {
-            loadTermsCount(for: module) { [weak self] count in
-                guard let self = self else { return }
-                
-                DispatchQueue.main.async {
-                    // Cache the result
-                    self.termsCountCache[module.id] = count ?? 0
+        private func loadTermsCountForAllModules() {
+            // If no modules, just notify
+            if allModules.isEmpty {
+                self.onDataUpdated?()
+                return
+            }
+            
+            var modulesToLoad = allModules.count
+            var loadedCount = 0
+            
+            // Load terms count for each module
+            for module in allModules {
+                loadTermsCount(for: module) { [weak self] count in
+                    guard let self = self else { return }
                     
-                    // Notify that data is updated
-                    self.onDataUpdated?()
+                    DispatchQueue.main.async {
+                        // Cache the result
+                        self.termsCountCache[module.id] = count ?? 0
+                        loadedCount += 1
+                        
+                        // Notify when all modules are loaded
+                        if loadedCount == modulesToLoad {
+                            self.onDataUpdated?()
+                        }
+                    }
                 }
             }
         }
-    }
     
     private func loadTermsCount(for module: ModuleResponse, completion: @escaping (Int?) -> Void) {
         NetworkManager.shared.getModuleTerms(moduleId: module.id) { result in

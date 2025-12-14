@@ -132,9 +132,19 @@ class AccountViewModel {
     }
     
     private func loadProfileImageFromCache() {
-        if let imageData = UserDefaults.standard.data(forKey: "profileImage"),
+        guard let user = currentUser else {
+            print("⚠️ No current user found for loading cache")
+            return
+        }
+        
+        let cacheKey = "profileImage_\(user.id)"
+        
+        if let imageData = UserDefaults.standard.data(forKey: cacheKey),
            let image = UIImage(data: imageData) {
             profileImage = image
+            print("✅ Loaded profile image from cache for user: \(user.id)")
+        } else {
+            print("⚠️ No cached image found for user: \(user.id)")
         }
     }
     
@@ -150,23 +160,37 @@ class AccountViewModel {
     
     private func loadProfileImageFromBackend() {
         guard let user = currentUser,
-                 let profilePicturePath = user.profilePicture else {
-               print("⚠️ No profile picture URL available")
-               return
-           }
-           
-           print("📸 Profile picture path from server: \(profilePicturePath)")
-           
-           // Construct the full URL
-           let fullImageUrlString = "https://imba-server.up.railway.app" + profilePicturePath
-           print("📸 Full download URL: \(fullImageUrlString)")
-           
-           guard let profilePictureUrl = URL(string: fullImageUrlString) else {
-               print("❌ Failed to create URL from string: \(fullImageUrlString)")
-               return
-           }
+              let profilePicturePath = user.profilePicture else {
+            print("⚠️ No profile picture URL available")
+            return
+        }
         
-        // Download image
+        print("📸 Profile picture path from server: \(profilePicturePath)")
+        
+        // Construct the full URL
+        let fullImageUrlString = "https://imba-server.up.railway.app" + profilePicturePath
+        print("📸 Full download URL: \(fullImageUrlString)")
+        
+        guard let profilePictureUrl = URL(string: fullImageUrlString) else {
+            print("❌ Failed to create URL from string: \(fullImageUrlString)")
+            return
+        }
+        
+        // User-specific cache key (CRITICAL FIX)
+        let cacheKey = "profileImage_\(user.id)"
+        
+        // Check cache first using user-specific key
+        if let cachedImageData = UserDefaults.standard.data(forKey: cacheKey),
+           let cachedImage = UIImage(data: cachedImageData) {
+            print("✅ Loaded profile image from cache for user: \(user.id)")
+            DispatchQueue.main.async {
+                self.profileImage = cachedImage
+                self.onProfileImageUpdated?(cachedImage)
+            }
+            return
+        }
+        
+        // Download image if not in cache
         DispatchQueue.global().async { [weak self] in
             URLSession.shared.dataTask(with: profilePictureUrl) { data, response, error in
                 if let error = error {
@@ -180,13 +204,14 @@ class AccountViewModel {
                 }
                 
                 DispatchQueue.main.async {
-                    print("✅ Successfully downloaded profile image")
+                    print("✅ Successfully downloaded profile image for user: \(user.id)")
                     self?.profileImage = image
                     
-                    // Cache the image
+                    // Cache the image with user-specific key
                     if let imageData = image.jpegData(compressionQuality: 0.8) {
-                        UserDefaults.standard.set(imageData, forKey: "profileImage_\(user.id)")
+                        UserDefaults.standard.set(imageData, forKey: cacheKey)
                         UserDefaults.standard.synchronize()
+                        print("✅ Profile image cached with key: \(cacheKey)")
                     }
                     
                     self?.onProfileImageUpdated?(image)
@@ -195,15 +220,6 @@ class AccountViewModel {
         }
     }
     
-//    private func uploadProfileImageToBackend(_ image: UIImage) {
-//        // TODO: Implement API call to upload profile image
-//        print("📸 Uploading profile image to backend...")
-//        
-//        // Simulate upload
-//        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-//            print("✅ Profile image uploaded successfully")
-//        }
-//    }
     
     private func deleteProfileImageFromBackend() {
         // TODO: Implement API call to delete profile image
@@ -291,20 +307,46 @@ class AccountViewModel {
     }
     
     func performAccountDeletion() {
+        guard !isLoading else { return }
+        
         isLoading = true
         
-        // TODO: Implement actual account deletion API call
-        // For now, simulate deletion
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+        // Show loading indicator
+        DispatchQueue.main.async {
+            // You might want to show a loading indicator here
+            print("🔄 Starting account deletion...")
+        }
+        
+        // Call the actual API
+        NetworkManager.shared.deleteAccount { [weak self] result in
             guard let self = self else { return }
             
-            self.isLoading = false
-            
-            // Clear all local data
-            self.clearLocalData()
-            
-            // Notify account deletion success
-            self.onAccountDeleteSuccess?()
+            DispatchQueue.main.async {
+                self.isLoading = false
+                
+                switch result {
+                case .success(let response):
+                    print("✅ Account deletion API success: \(response.message)")
+                    
+                    // Clear all local data regardless of API response
+                    self.clearLocalData()
+                    
+                    // Notify account deletion success
+                    self.onAccountDeleteSuccess?()
+                    
+                case .failure(let error):
+                    print("❌ Account deletion failed: \(error)")
+                    
+                    // Even if API fails, we should clear local data for security
+                    self.clearLocalData()
+                    
+                    // Show error to user
+                    self.onError?("Failed to delete account on server, but local data was cleared. Error: \(error.localizedDescription)")
+                    
+                    // Still navigate to authentication since we cleared local data
+                    self.onAccountDeleteSuccess?()
+                }
+            }
         }
     }
     
