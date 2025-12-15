@@ -1,7 +1,14 @@
-// ChangePasswordViewController.swift
+//
+//  ChangePasswordViewController.swift
+//  ImbaLearn
+//
+
 import UIKit
 
 class ChangePasswordViewController: BaseViewController {
+    
+    // MARK: - Properties
+    private let viewModel = ChangePasswordViewModel()
     
     // MARK: - UI Elements
     private lazy var scrollView: UIScrollView = {
@@ -24,7 +31,6 @@ class ChangePasswordViewController: BaseViewController {
         return view
     }()
     
-    // ADD BACK BUTTON
     private lazy var backButton: UIButton = {
         let button = UIButton(type: .system)
         button.setImage(UIImage(systemName: "chevron.left"), for: .normal)
@@ -180,10 +186,18 @@ class ChangePasswordViewController: BaseViewController {
         return button
     }()
     
-    // MARK: - Properties
-    private var isCurrentPasswordVisible = false
-    private var isNewPasswordVisible = false
-    private var isConfirmPasswordVisible = false
+    private lazy var loadingView: UIView = {
+        let view = UIView(frame: self.view.bounds)
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        view.isHidden = true
+        
+        let activityIndicator = UIActivityIndicatorView(style: .large)
+        activityIndicator.center = view.center
+        activityIndicator.startAnimating()
+        view.addSubview(activityIndicator)
+        
+        return view
+    }()
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -192,14 +206,16 @@ class ChangePasswordViewController: BaseViewController {
         setupConstraints()
         setupTextFields()
         setupNavigationBar()
+        setupViewModelCallbacks()
     }
     
+    // MARK: - Setup Methods
     private func setupUI() {
         view.backgroundColor = .background
         
         // Add header view
         view.addSubview(headerView)
-        headerView.addSubview(backButton) // ADD BACK BUTTON TO HEADER
+        headerView.addSubview(backButton)
         headerView.addSubview(titleLabel)
         
         // Add scroll view and content view
@@ -214,13 +230,14 @@ class ChangePasswordViewController: BaseViewController {
             requirementsLabel,
             changePasswordButton
         )
+        
+        // Add loading view
+        view.addSubview(loadingView)
     }
     
     private func setupNavigationBar() {
         // Hide the default back button if it exists
         navigationItem.hidesBackButton = true
-    
-  
     }
     
     private func setupTextFields() {
@@ -232,6 +249,22 @@ class ChangePasswordViewController: BaseViewController {
         
         // Enable keyboard avoidance
         setupKeyboardAvoidance(with: scrollView)
+    }
+    
+    private func setupViewModelCallbacks() {
+        viewModel.onViewStateChanged = { [weak self] state in
+            DispatchQueue.main.async {
+                self?.handleViewState(state)
+            }
+        }
+        
+        viewModel.onNavigateBack = { [weak self] in
+            self?.navigateBack()
+        }
+        
+        viewModel.onNavigateToLogin = { [weak self] in
+            self?.logoutAndGoToLogin()
+        }
     }
     
     private func setupConstraints() {
@@ -247,13 +280,13 @@ class ChangePasswordViewController: BaseViewController {
             headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             headerView.heightAnchor.constraint(equalToConstant: headerHeight),
             
-            // Back Button - ADD THESE CONSTRAINTS
+            // Back Button
             backButton.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: padding),
             backButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor, constant: 20),
             backButton.widthAnchor.constraint(equalToConstant: 44),
             backButton.heightAnchor.constraint(equalToConstant: 44),
             
-            // Title Label - UPDATE TO ACCOUNT FOR BACK BUTTON
+            // Title Label
             titleLabel.centerYAnchor.constraint(equalTo: headerView.centerYAnchor, constant: 20),
             titleLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 25),
             titleLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -padding),
@@ -324,7 +357,96 @@ class ChangePasswordViewController: BaseViewController {
     // MARK: - Actions
     @objc private func backButtonTapped() {
         print("← Back button tapped")
+        viewModel.navigateBack()
+    }
+    
+    @objc private func toggleCurrentPasswordVisibility() {
+        viewModel.toggleCurrentPasswordVisibility()
+        updatePasswordFieldVisibility()
+    }
+    
+    @objc private func toggleNewPasswordVisibility() {
+        viewModel.toggleNewPasswordVisibility()
+        updatePasswordFieldVisibility()
+    }
+    
+    @objc private func toggleConfirmPasswordVisibility() {
+        viewModel.toggleConfirmPasswordVisibility()
+        updatePasswordFieldVisibility()
+    }
+    
+    @objc private func changePasswordTapped() {
+        view.endEditing(true)
+        viewModel.changePassword(
+            currentPassword: currentPasswordTextField.text,
+            newPassword: newPasswordTextField.text,
+            confirmPassword: confirmPasswordTextField.text
+        )
+    }
+    
+    // MARK: - State Handling
+    private func handleViewState(_ state: ChangePasswordViewModel.ViewState) {
+        switch state {
+        case .idle:
+            // Do nothing
+            break
+            
+        case .loading:
+            showLoading()
+            
+        case .success(let message):
+            hideLoading()
+            showSuccessAlert(message: message)
+            
+        case .validationError(let title, let message, let field):
+            hideLoading()
+            showAlert(title: title, message: message)
+            focusOnField(field)
+            
+        case .changePasswordError(let title, let message):
+            hideLoading()
+            showAlert(title: title, message: message)
+            
+        case .networkError(let error):
+            hideLoading()
+            handleNetworkError(error)
+        }
+    }
+    
+    private func focusOnField(_ field: ChangePasswordViewModel.FocusField) {
+        switch field {
+        case .currentPassword:
+            currentPasswordTextField.becomeFirstResponder()
+        case .newPassword:
+            newPasswordTextField.becomeFirstResponder()
+        case .confirmPassword:
+            confirmPasswordTextField.becomeFirstResponder()
+        }
+    }
+    
+    // MARK: - UI Updates
+    private func updatePasswordFieldVisibility() {
+        // Update current password field
+        currentPasswordTextField.isSecureTextEntry = !viewModel.isCurrentPasswordVisible
+        let currentButton = currentPasswordTextField.rightView as? UIButton
+        let currentImageName = viewModel.isCurrentPasswordVisible ? "eye" : "eye.slash"
+        currentButton?.setImage(UIImage(systemName: currentImageName), for: .normal)
         
+        // Update new password field
+        newPasswordTextField.isSecureTextEntry = !viewModel.isNewPasswordVisible
+        let newButton = newPasswordTextField.rightView as? UIButton
+        let newImageName = viewModel.isNewPasswordVisible ? "eye" : "eye.slash"
+        newButton?.setImage(UIImage(systemName: newImageName), for: .normal)
+        
+        // Update confirm password field
+        confirmPasswordTextField.isSecureTextEntry = !viewModel.isConfirmPasswordVisible
+        let confirmButton = confirmPasswordTextField.rightView as? UIButton
+        let confirmImageName = viewModel.isConfirmPasswordVisible ? "eye" : "eye.slash"
+        confirmButton?.setImage(UIImage(systemName: confirmImageName), for: .normal)
+    }
+    
+    // MARK: - Navigation
+    private func navigateBack() {
         // Try different ways to go back
         if let navigationController = navigationController, navigationController.viewControllers.count > 1 {
             // If we're in a navigation stack, pop back
@@ -338,156 +460,45 @@ class ChangePasswordViewController: BaseViewController {
         }
     }
     
-    @objc private func toggleCurrentPasswordVisibility() {
-        isCurrentPasswordVisible.toggle()
-        currentPasswordTextField.isSecureTextEntry = !isCurrentPasswordVisible
-        
-        let button = currentPasswordTextField.rightView as? UIButton
-        let imageName = isCurrentPasswordVisible ? "eye" : "eye.slash"
-        button?.setImage(UIImage(systemName: imageName), for: .normal)
-    }
-    
-    @objc private func toggleNewPasswordVisibility() {
-        isNewPasswordVisible.toggle()
-        newPasswordTextField.isSecureTextEntry = !isNewPasswordVisible
-        
-        let button = newPasswordTextField.rightView as? UIButton
-        let imageName = isNewPasswordVisible ? "eye" : "eye.slash"
-        button?.setImage(UIImage(systemName: imageName), for: .normal)
-    }
-    
-    @objc private func toggleConfirmPasswordVisibility() {
-        isConfirmPasswordVisible.toggle()
-        confirmPasswordTextField.isSecureTextEntry = !isConfirmPasswordVisible
-        
-        let button = confirmPasswordTextField.rightView as? UIButton
-        let imageName = isConfirmPasswordVisible ? "eye" : "eye.slash"
-        button?.setImage(UIImage(systemName: imageName), for: .normal)
-    }
-    
-    @objc private func changePasswordTapped() {
-        view.endEditing(true)
-        
-        // Validate inputs
-        guard validateInputs() else { return }
-        
-        // Show loading
-        showLoading()
-        
-        // Get the passwords
-        let oldPassword = currentPasswordTextField.text ?? ""
-        let newPassword = newPasswordTextField.text ?? ""
-        let confirmPassword = confirmPasswordTextField.text ?? ""
-        
-        print("🔐 Changing password...")
-        print("   Old: \(String(repeating: "*", count: oldPassword.count))")
-        print("   New: \(String(repeating: "*", count: newPassword.count))")
-        print("   Confirm: \(String(repeating: "*", count: confirmPassword.count))")
-        
-        // Call API to change password
-        NetworkManager.shared.changePassword(
-            oldPassword: oldPassword,
-            newPassword: newPassword,
-            confirmPassword: confirmPassword
-        ) { [weak self] result in
-            DispatchQueue.main.async {
-                self?.hideLoading()
-                self?.handleChangePasswordResult(result)
-            }
+    private func logoutAndGoToLogin() {
+        // Navigate to login
+        if let sceneDelegate = UIApplication.shared.connectedScenes.first?.delegate as? SceneDelegate {
+            sceneDelegate.showAuthentication(animated: true)
         }
     }
     
-    // MARK: - Validation
-    private func validateInputs() -> Bool {
-        // Validate old password
-        guard let oldPassword = currentPasswordTextField.text,
-              !oldPassword.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please enter your old password")
-            currentPasswordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Validate new password
-        guard let newPassword = newPasswordTextField.text,
-              !newPassword.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please enter a new password")
-            newPasswordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Check password requirements
-        guard isValidPassword(newPassword) else {
-            showAlert(title: "Validation Error", message: "Password must be at least 8 characters with uppercase, lowercase, and number")
-            newPasswordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Validate confirm password
-        guard let confirmPassword = confirmPasswordTextField.text,
-              !confirmPassword.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please confirm your new password")
-            confirmPasswordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Check if passwords match
-        guard newPassword == confirmPassword else {
-            showAlert(title: "Validation Error", message: "New passwords do not match")
-            confirmPasswordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Check if new password is different from old
-        guard newPassword != oldPassword else {
-            showAlert(title: "Validation Error", message: "New password must be different from old password")
-            newPasswordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        return true
+    // MARK: - UI Helper Methods
+    private func showLoading() {
+        loadingView.isHidden = false
+        view.isUserInteractionEnabled = false
     }
     
-    private func isValidPassword(_ password: String) -> Bool {
-        // At least 8 characters
-        guard password.count >= 8 else { return false }
-        
-        // At least one uppercase letter
-        let uppercaseRegex = ".*[A-Z]+.*"
-        let uppercaseTest = NSPredicate(format: "SELF MATCHES %@", uppercaseRegex)
-        guard uppercaseTest.evaluate(with: password) else { return false }
-        
-        // At least one lowercase letter
-        let lowercaseRegex = ".*[a-z]+.*"
-        let lowercaseTest = NSPredicate(format: "SELF MATCHES %@", lowercaseRegex)
-        guard lowercaseTest.evaluate(with: password) else { return false }
-        
-        // At least one number
-        let numberRegex = ".*[0-9]+.*"
-        let numberTest = NSPredicate(format: "SELF MATCHES %@", numberRegex)
-        guard numberTest.evaluate(with: password) else { return false }
-        
-        return true
+    private func hideLoading() {
+        loadingView.isHidden = true
+        view.isUserInteractionEnabled = true
     }
     
-    // MARK: - Handle Result
-    private func handleChangePasswordResult(_ result: Result<AuthResponse, NetworkError>) {
-        switch result {
-        case .success(let response):
-            print("✅ Change password response: ok=\(response.ok), message=\(response.message)")
-            
-            if response.ok {
-                showSuccessAlert(message: response.message)
-            } else {
-                // API returned success false with error message
-                showAlert(title: "Change Password Failed", message: response.message)
-            }
-            
-        case .failure(let error):
-            print("❌ Change password error: \(error)")
-            handleNetworkError(error)
-        }
+    private func showSuccessAlert(message: String) {
+        let alert = UIAlertController(
+            title: "Success!",
+            message: "\(message)\n\nPlease login again with your new password.",
+            preferredStyle: .alert
+        )
+        
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            // Logout and go to login screen
+            self?.viewModel.logoutAndGoToLogin()
+        })
+        
+        present(alert, animated: true)
     }
-
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
+    
     private func handleNetworkError(_ error: NetworkError) {
         switch error {
         case .unauthorized:
@@ -512,64 +523,6 @@ class ChangePasswordViewController: BaseViewController {
         default:
             showAlert(title: "Error", message: error.localizedDescription)
         }
-    }
-    
-    private func showSuccessAlert(message: String) {
-        let alert = UIAlertController(
-            title: "Success!",
-            message: "\(message)\n\nPlease login again with your new password.",
-            preferredStyle: .alert
-        )
-        
-        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
-            // Logout and go to login screen
-            self?.logoutAndGoToLogin()
-        })
-        
-        present(alert, animated: true)
-    }
-    
-    private func logoutAndGoToLogin() {
-        // Clear local data
-        NetworkManager.shared.authToken = nil
-        UserDefaults.standard.removeObject(forKey: "authToken")
-        UserDefaults.standard.removeObject(forKey: "currentUser")
-        UserDefaults.standard.synchronize()
-        
-        // Navigate to login
-        if let sceneDelegate = UIApplication.shared.connectedScenes.first?.delegate as? SceneDelegate {
-            sceneDelegate.showAuthentication(animated: true)
-        }
-    }
-    
-    // MARK: - Helper Methods
-    private func showLoading() {
-        let loadingView = UIView(frame: view.bounds)
-        loadingView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
-        loadingView.tag = 999
-        
-        let activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.center = loadingView.center
-        activityIndicator.startAnimating()
-        loadingView.addSubview(activityIndicator)
-        
-        view.addSubview(loadingView)
-        view.isUserInteractionEnabled = false
-    }
-    
-    private func hideLoading() {
-        view.subviews.forEach { subview in
-            if subview.tag == 999 {
-                subview.removeFromSuperview()
-            }
-        }
-        view.isUserInteractionEnabled = true
-    }
-    
-    private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
     }
 }
 

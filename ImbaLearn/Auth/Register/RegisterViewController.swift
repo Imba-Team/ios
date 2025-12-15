@@ -1,3 +1,4 @@
+//
 //  RegisterViewController.swift
 //  ImbaLearn
 //
@@ -7,6 +8,9 @@
 import UIKit
 
 class RegisterViewController: BaseViewController {
+    
+    // MARK: - Properties
+    private let viewModel = RegisterViewModel()
     
     // MARK: - UI Elements
     private lazy var scrollView: UIScrollView = {
@@ -165,14 +169,29 @@ class RegisterViewController: BaseViewController {
         return button
     }()
     
+    private lazy var loadingView: UIView = {
+        let view = UIView(frame: self.view.bounds)
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        view.isHidden = true
+        
+        let activityIndicator = UIActivityIndicatorView(style: .large)
+        activityIndicator.center = view.center
+        activityIndicator.startAnimating()
+        view.addSubview(activityIndicator)
+        
+        return view
+    }()
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
         setupConstraints()
         setupTextFields()
+        setupViewModelCallbacks()
     }
     
+    // MARK: - Setup Methods
     private func setupUI() {
         view.backgroundColor = .background
         
@@ -189,6 +208,10 @@ class RegisterViewController: BaseViewController {
         // Add all form elements to contentView (only full name, no separate first/last)
         contentView.addSubviews(fullNameLabel, fullNameTextField, emailLabel, emailTextField, passwordLabel, passwordTextField, confirmPasswordLabel, confirmPasswordTextField, registerButton, loginButton)
         
+        // Add loading view
+        view.addSubview(loadingView)
+        
+        // Add button targets
         registerButton.addTarget(self, action: #selector(registerTapped), for: .touchUpInside)
         loginButton.addTarget(self, action: #selector(loginTapped), for: .touchUpInside)
     }
@@ -202,6 +225,22 @@ class RegisterViewController: BaseViewController {
         
         // Enable keyboard avoidance
         setupKeyboardAvoidance(with: scrollView)
+    }
+    
+    private func setupViewModelCallbacks() {
+        viewModel.onViewStateChanged = { [weak self] state in
+            DispatchQueue.main.async {
+                self?.handleViewState(state)
+            }
+        }
+        
+        viewModel.onNavigateToMainApp = { [weak self] in
+            self?.navigateToMainApp()
+        }
+        
+        viewModel.onNavigateToLogin = { [weak self] in
+            self?.navigateToLogin()
+        }
     }
     
     private func setupConstraints() {
@@ -302,119 +341,109 @@ class RegisterViewController: BaseViewController {
         // Hide keyboard
         view.endEditing(true)
         
-        // Validate inputs
-        guard validateInputs() else { return }
-        
-        // Show loading
-        showLoading()
-        
-        // Create request with single name field
-        let registerRequest = RegisterRequest(
-            name: fullNameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            email: emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            password: passwordTextField.text ?? ""
+        // Call viewModel register
+        viewModel.register(
+            fullName: fullNameTextField.text,
+            email: emailTextField.text,
+            password: passwordTextField.text,
+            confirmPassword: confirmPasswordTextField.text
         )
-        
-        print("Sending registration request with name: \(registerRequest.name)")
-        
-        // Call API
-        NetworkManager.shared.register(request: registerRequest) { [weak self] result in
-            DispatchQueue.main.async {
-                self?.hideLoading()
-                self?.handleRegistrationResult(result)
-            }
-        }
     }
     
     @objc private func loginTapped() {
-        navigationController?.popViewController(animated: true)
+        viewModel.navigateToLogin()
     }
     
-    // MARK: - Validation
-    private func validateInputs() -> Bool {
-        // Validate full name
-        guard let fullName = fullNameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !fullName.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please enter your full name")
-            fullNameTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Validate email
-        guard let email = emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !email.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please enter your email")
-            emailTextField.becomeFirstResponder()
-            return false
-        }
-        
-        guard isValidEmail(email) else {
-            showAlert(title: "Validation Error", message: "Please enter a valid email address")
-            emailTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Validate password
-        guard let password = passwordTextField.text, !password.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please enter a password")
-            passwordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        guard password.count >= 6 else {
-            showAlert(title: "Validation Error", message: "Password must be at least 6 characters")
-            passwordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Validate confirm password
-        guard let confirmPassword = confirmPasswordTextField.text,
-              !confirmPassword.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please confirm your password")
-            confirmPasswordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        guard password == confirmPassword else {
-            showAlert(title: "Validation Error", message: "Passwords do not match")
-            confirmPasswordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        return true
-    }
-    
-    private func isValidEmail(_ email: String) -> Bool {
-        let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let emailPred = NSPredicate(format: "SELF MATCHES %@", emailRegEx)
-        return emailPred.evaluate(with: email)
-    }
-    
-    // MARK: - Handle Registration Result
-    private func handleRegistrationResult(_ result: Result<AuthResponse, NetworkError>) {
-        switch result {
-        case .success(let response):
-            if response.ok {
-                // Save user info from registration
-                let name = fullNameTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                let email = emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                
-                UserDefaults.standard.set(name, forKey: "userName")
-                UserDefaults.standard.set(email, forKey: "userEmail")
-                UserDefaults.standard.synchronize()
-                
-                // Show success
-                showSuccessAlert(message: response.message)
-            } else {
-                // API returned error
-                showAlert(title: "Registration Failed", message: response.message)
-            }
+    // MARK: - State Handling
+    private func handleViewState(_ state: RegisterViewModel.ViewState) {
+        switch state {
+        case .idle:
+            // Do nothing
+            break
             
-        case .failure(let error):
+        case .loading:
+            showLoading()
+            
+        case .success(let message):
+            hideLoading()
+            showSuccessAlert(message: message)
+            
+        case .validationError(let title, let message):
+            hideLoading()
+            showAlert(title: title, message: message)
+            focusOnField(for: title, message: message)
+            
+        case .registrationError(let title, let message):
+            hideLoading()
+            showAlert(title: title, message: message)
+            
+        case .networkError(let error):
+            hideLoading()
             handleNetworkError(error)
         }
     }
-
+    
+    private func focusOnField(for title: String, message: String) {
+        if message.contains("full name") || message.contains("Full Name") {
+            fullNameTextField.becomeFirstResponder()
+        } else if message.contains("email") || message.contains("Email") {
+            emailTextField.becomeFirstResponder()
+        } else if message.contains("password") || message.contains("Password") {
+            if message.contains("confirm") || message.contains("Confirm") {
+                confirmPasswordTextField.becomeFirstResponder()
+            } else {
+                passwordTextField.becomeFirstResponder()
+            }
+        }
+    }
+    
+    // MARK: - Navigation
+    private func navigateToMainApp() {
+        // Add a smooth transition
+        UIView.animate(withDuration: 0.2, animations: {
+            self.view.alpha = 0.8
+        }) { _ in
+            if let sceneDelegate = UIApplication.shared.connectedScenes.first?.delegate as? SceneDelegate {
+                sceneDelegate.showMainApp(animated: true)
+            }
+        }
+    }
+    
+    private func navigateToLogin() {
+        navigationController?.popViewController(animated: true)
+    }
+    
+    // MARK: - UI Helper Methods
+    private func showLoading() {
+        loadingView.isHidden = false
+        view.isUserInteractionEnabled = false
+    }
+    
+    private func hideLoading() {
+        loadingView.isHidden = true
+        view.isUserInteractionEnabled = true
+    }
+    
+    private func showSuccessAlert(message: String) {
+        let alert = UIAlertController(
+            title: "Success!",
+            message: "\(message)\n\nYou have been automatically logged in.",
+            preferredStyle: .alert
+        )
+        
+        present(alert, animated: true)
+        
+        // Auto-dismiss and navigate after a brief delay
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            alert.dismiss(animated: true)
+        }
+    }
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
+    }
     
     private func handleNetworkError(_ error: NetworkError) {
         switch error {
@@ -457,75 +486,6 @@ class RegisterViewController: BaseViewController {
         case .unknown:
             showAlert(title: "Error", message: "An unknown error occurred")
         }
-    }
-    
-    private func showSuccessAlert(message: String) {
-        let alert = UIAlertController(
-            title: "Success!",
-            message: "\(message)\n\nYou have been automatically logged in.",
-            preferredStyle: .alert
-        )
-        
-        present(alert, animated: true)
-        
-        // Auto-dismiss and navigate after a brief delay
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-            alert.dismiss(animated: true) {
-                // Add a smooth transition
-                UIView.animate(withDuration: 0.2, animations: {
-                    self?.view.alpha = 0.8
-                }) { _ in
-                    if let sceneDelegate = UIApplication.shared.connectedScenes.first?.delegate as? SceneDelegate {
-                        sceneDelegate.showMainApp(animated: true)
-                    }
-                }
-            }
-        }
-    }
-    
-    private func navigateToMainScreen() {
-        // Check if we have a token (user should be logged in)
-        if NetworkManager.shared.authToken != nil {
-            print("✅ User is logged in, navigating to main screen")
-            
-            if let sceneDelegate = UIApplication.shared.connectedScenes.first?.delegate as? SceneDelegate {
-                       sceneDelegate.showMainApp()
-                   }
-               } else {
-                   // Go back to login
-                   navigationController?.popViewController(animated: true)
-               }
-    }
-
-    
-    // MARK: - Helper Methods
-    private func showLoading() {
-        let loadingView = UIView(frame: view.bounds)
-        loadingView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
-        loadingView.tag = 999
-        
-        let activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.center = loadingView.center
-        activityIndicator.startAnimating()
-        loadingView.addSubview(activityIndicator)
-        
-        view.addSubview(loadingView)
-        view.isUserInteractionEnabled = false
-    }
-    
-    private func hideLoading() {
-        view.subviews.forEach { subview in
-            if subview.tag == 999 {
-                subview.removeFromSuperview()
-            }
-        }
-        view.isUserInteractionEnabled = true
-    }
-    
-    private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
     }
 }
 

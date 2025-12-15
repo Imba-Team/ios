@@ -14,10 +14,19 @@ class LibraryViewModel {
     private var termsCountCache: [String: Int] = [:]
     
     // MARK: - Callbacks
-    var onDataUpdated: (() -> Void)?
+    var onDataUpdated: (() -> Void)? //associated value - viewState enum
     var onError: ((String) -> Void)?
     var onNavigateToModuleDetail: ((ModuleResponse) -> Void)?
     var onUpdateEmptyState: ((Bool, String) -> Void)?
+    
+//    enum ViewState {
+//        case loading
+//        case loaded
+//        case empty
+//        case error(String)
+//        case saving
+//        case saved
+//    }
     
     // MARK: - Public Methods
     

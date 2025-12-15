@@ -1,3 +1,4 @@
+//
 //  LoginViewController.swift
 //  ImbaLearn
 //
@@ -7,6 +8,9 @@
 import UIKit
 
 class LoginViewController: BaseViewController {
+    
+    // MARK: - Properties
+    private let viewModel = LoginViewModel()
     
     // MARK: - UI Elements
     private lazy var scrollView: UIScrollView = {
@@ -103,15 +107,6 @@ class LoginViewController: BaseViewController {
         return button
     }()
     
-    private lazy var forgotPasswordButton: UIButton = {
-        let button = UIButton(type: .system)
-        button.setTitle("Forgot Password?", for: .normal)
-        button.setTitleColor(.pinkButton, for: .normal)
-        button.titleLabel?.font = UIFont.systemFont(ofSize: 16)
-        button.translatesAutoresizingMaskIntoConstraints = false
-        return button
-    }()
-    
     private lazy var registerButton: UIButton = {
         let button = UIButton(type: .system)
         button.setTitle("New Member? Register!", for: .normal)
@@ -121,32 +116,50 @@ class LoginViewController: BaseViewController {
         return button
     }()
     
+    private lazy var loadingView: UIView = {
+        let view = UIView(frame: view.bounds)
+        view.backgroundColor = UIColor.black.withAlphaComponent(0.3)
+        view.isHidden = true
+        
+        let activityIndicator = UIActivityIndicatorView(style: .large)
+        activityIndicator.center = view.center
+        activityIndicator.startAnimating()
+        view.addSubview(activityIndicator)
+        
+        return view
+    }()
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
         setupConstraints()
         setupTextFields()
-        
-        
+        setupViewModelCallbacks()
+        navigationController?.navigationBar.tintColor = .white
+
     }
     
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        // Update gradient layer frame when view layout changes
+        if let gradientLayer = headerView.layer.sublayers?.first as? CAGradientLayer {
+            gradientLayer.frame = headerView.bounds
+        }
+    }
+    
+    // MARK: - Setup Methods
     private func setupUI() {
         view.backgroundColor = .background
         
-        // Add header view directly to main view (not in scroll view)
-        view.addSubview(headerView)
+        view.addSubviews(headerView, scrollView, loadingView)
         
-        // Add title label to header
         headerView.addSubview(titleLabel)
-        
-        // Add scroll view and content view below header
-        view.addSubview(scrollView)
         scrollView.addSubview(contentView)
         
-        // Add all form elements to contentView
-        contentView.addSubviews(emailLabel, emailTextField, passwordLabel, passwordTextField, forgotPasswordButton, loginButton, registerButton)
-        
+        contentView.addSubviews(emailLabel, emailTextField, passwordLabel, passwordTextField, loginButton, registerButton)
+                
+        // Add button targets
         loginButton.addTarget(self, action: #selector(loginTapped), for: .touchUpInside)
         registerButton.addTarget(self, action: #selector(registerTapped), for: .touchUpInside)
     }
@@ -162,30 +175,19 @@ class LoginViewController: BaseViewController {
         setupKeyboardAvoidance(with: scrollView)
     }
     
-//    private func setupGradientHeader() {
-//        // Create gradient layer
-//        let gradientLayer = CAGradientLayer()
-//        gradientLayer.colors = [
-//            UIColor.pinkButton.withAlphaComponent(0.7).cgColor, // Lighter pink
-//            UIColor.greenButton.withAlphaComponent(0.7).cgColor
-//        ]
-//        gradientLayer.locations = [0.0, 1.0]
-//        gradientLayer.startPoint = CGPoint(x: 0.0, y: 0.5)
-//        gradientLayer.endPoint = CGPoint(x: 1.0, y: 0.5)
-//        
-//        // Set the frame after layout
-//        DispatchQueue.main.async {
-//            gradientLayer.frame = self.headerView.bounds
-//        }
-//        
-//        headerView.layer.insertSublayer(gradientLayer, at: 0)
-//    }
-//    
-    override func viewDidLayoutSubviews() {
-        super.viewDidLayoutSubviews()
-        // Update gradient layer frame when view layout changes
-        if let gradientLayer = headerView.layer.sublayers?.first as? CAGradientLayer {
-            gradientLayer.frame = headerView.bounds
+    private func setupViewModelCallbacks() {
+        viewModel.onViewStateChanged = { [weak self] state in
+            DispatchQueue.main.async {
+                self?.handleViewState(state)
+            }
+        }
+        
+        viewModel.onNavigateToMainApp = { [weak self] in
+            self?.navigateToMainApp()
+        }
+        
+        viewModel.onNavigateToRegister = { [weak self] in
+            self?.navigateToRegister()
         }
     }
     
@@ -244,13 +246,8 @@ class LoginViewController: BaseViewController {
             passwordTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             passwordTextField.heightAnchor.constraint(equalToConstant: fieldHeight),
             
-            // Forgot Password Button
-            forgotPasswordButton.topAnchor.constraint(equalTo: passwordTextField.bottomAnchor, constant: 12),
-            forgotPasswordButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
-            forgotPasswordButton.heightAnchor.constraint(equalToConstant: 30),
-            
-            // Login Button
-            loginButton.topAnchor.constraint(equalTo: forgotPasswordButton.bottomAnchor, constant: 30),
+            // Login Button (positioned directly under password field)
+            loginButton.topAnchor.constraint(equalTo: passwordTextField.bottomAnchor, constant: 30),
             loginButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             loginButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             loginButton.heightAnchor.constraint(equalToConstant: fieldHeight),
@@ -263,105 +260,59 @@ class LoginViewController: BaseViewController {
         ])
     }
     
+    // MARK: - Actions
     @objc private func loginTapped() {
         // Hide keyboard
         view.endEditing(true)
         
-        // Validate inputs
-        guard validateInputs() else { return }
-        
-        // Show loading
-        showLoading()
-        
-        // Create login request
-        let loginRequest = LoginRequest(
-            email: emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "",
-            password: passwordTextField.text ?? ""
-        )
-        
-        print("🔐 Attempting login for: \(loginRequest.email)")
-        
-        // Call API
-        NetworkManager.shared.login(request: loginRequest) { [weak self] result in
-            DispatchQueue.main.async {
-                self?.hideLoading()
-                self?.handleLoginResult(result)
-            }
-        }
+        // Call viewModel login
+        viewModel.login(email: emailTextField.text, password: passwordTextField.text)
     }
     
     @objc private func registerTapped() {
-        let registerVC = RegisterViewController()
-        navigationController?.pushViewController(registerVC, animated: true)
+        viewModel.navigateToRegister()
     }
     
-    // MARK: - Validation
-    private func validateInputs() -> Bool {
-        // Validate email
-        guard let email = emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !email.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please enter your email")
-            emailTextField.becomeFirstResponder()
-            return false
-        }
-        
-        guard isValidEmail(email) else {
-            showAlert(title: "Validation Error", message: "Please enter a valid email address")
-            emailTextField.becomeFirstResponder()
-            return false
-        }
-        
-        // Validate password
-        guard let password = passwordTextField.text, !password.isEmpty else {
-            showAlert(title: "Validation Error", message: "Please enter your password")
-            passwordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        guard password.count >= 6 else {
-            showAlert(title: "Validation Error", message: "Password must be at least 6 characters")
-            passwordTextField.becomeFirstResponder()
-            return false
-        }
-        
-        return true
-    }
-    
-    private func isValidEmail(_ email: String) -> Bool {
-        let emailRegEx = "[A-Z0-9a-z._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,64}"
-        let emailPred = NSPredicate(format: "SELF MATCHES %@", emailRegEx)
-        return emailPred.evaluate(with: email)
-    }
-    
-    // MARK: - Handle Login Result
-    private func handleLoginResult(_ result: Result<AuthResponse, NetworkError>) {
-        switch result {
-        case .success(let response):
-            if response.ok {
-                // Try to get user data if available in response
-                // For now, save basic info
-                if let email = emailTextField.text?.trimmingCharacters(in: .whitespacesAndNewlines) {
-                    UserDefaults.standard.set(email, forKey: "userEmail")
-                    // Try to extract name from email or use placeholder
-                    let name = email.components(separatedBy: "@").first ?? "User"
-                    UserDefaults.standard.set(name, forKey: "userName")
-                    UserDefaults.standard.synchronize()
-                }
-                
-                // Add a small delay for better UX
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                    // Navigate with animation
-                    self?.navigateToMainApp()
-                }
-            } else {
-                showAlert(title: "Login Failed", message: response.message)
+    // MARK: - State Handling
+    private func handleViewState(_ state: LoginViewModel.ViewState) {
+        switch state {
+        case .idle:
+            // Do nothing
+            break
+            
+        case .loading:
+            showLoading()
+            
+        case .success(let message):
+            hideLoading()
+            if let message = message {
+                showSuccessMessage(message)
             }
             
-        case .failure(let error):
+        case .validationError(let title, let message):
+            hideLoading()
+            showAlert(title: title, message: message)
+            focusOnField(for: title, message: message)
+            
+        case .loginError(let title, let message):
+            hideLoading()
+            showAlert(title: title, message: message)
+            
+        case .networkError(let error):
+            hideLoading()
             handleNetworkError(error)
         }
     }
-
+    
+    private func focusOnField(for title: String, message: String) {
+        if message.contains("email") {
+            emailTextField.becomeFirstResponder()
+        } else if message.contains("password") || message.contains("Password") {
+            passwordTextField.becomeFirstResponder()
+        }
+    }
+    
+    // MARK: - Navigation
     private func navigateToMainApp() {
         // Optional: Add a brief fade animation before navigation
         UIView.animate(withDuration: 0.2, animations: {
@@ -373,8 +324,24 @@ class LoginViewController: BaseViewController {
         }
     }
     
-    private func showSuccessAndNavigate(message: String) {
-        // Show a brief success message then navigate
+    private func navigateToRegister() {
+        let registerVC = RegisterViewController()
+        navigationController?.pushViewController(registerVC, animated: true)
+    }
+    
+    // MARK: - UI Helper Methods
+    private func showLoading() {
+        loadingView.isHidden = false
+        view.isUserInteractionEnabled = false
+    }
+    
+    private func hideLoading() {
+        loadingView.isHidden = true
+        view.isUserInteractionEnabled = true
+    }
+    
+    private func showSuccessMessage(_ message: String) {
+        // Show a brief success message
         let alert = UIAlertController(
             title: "Success!",
             message: message,
@@ -383,12 +350,16 @@ class LoginViewController: BaseViewController {
         
         present(alert, animated: true)
         
-        // Dismiss after 1 second and navigate
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) { [weak self] in
-            alert.dismiss(animated: true) {
-                self?.navigateToMainApp()
-            }
+        // Dismiss after 1 second
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            alert.dismiss(animated: true)
         }
+    }
+    
+    private func showAlert(title: String, message: String) {
+        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
     
     private func handleNetworkError(_ error: NetworkError) {
@@ -432,36 +403,6 @@ class LoginViewController: BaseViewController {
         case .unknown:
             showAlert(title: "Error", message: "An unknown error occurred")
         }
-    }
-    
-    // MARK: - Helper Methods
-    private func showLoading() {
-        let loadingView = UIView(frame: view.bounds)
-        loadingView.backgroundColor = UIColor.black.withAlphaComponent(0.3)
-        loadingView.tag = 999
-        
-        let activityIndicator = UIActivityIndicatorView(style: .large)
-        activityIndicator.center = loadingView.center
-        activityIndicator.startAnimating()
-        loadingView.addSubview(activityIndicator)
-        
-        view.addSubview(loadingView)
-        view.isUserInteractionEnabled = false
-    }
-    
-    private func hideLoading() {
-        view.subviews.forEach { subview in
-            if subview.tag == 999 {
-                subview.removeFromSuperview()
-            }
-        }
-        view.isUserInteractionEnabled = true
-    }
-    
-    private func showAlert(title: String, message: String) {
-        let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
-        alert.addAction(UIAlertAction(title: "OK", style: .default))
-        present(alert, animated: true)
     }
 }
 

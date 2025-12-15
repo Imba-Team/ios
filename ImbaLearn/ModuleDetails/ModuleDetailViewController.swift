@@ -1,19 +1,6 @@
-//
-//  ModuleDetailViewController.swift
-//  ImbaLearn
-//
-
 import UIKit
 
 class ModuleDetailViewController: BaseViewController {
-    
-    // MARK: - Properties
-    var module: ModuleResponse!
-    private var terms: [TermResponse] = []
-    private var filteredTerms: [TermResponse] = []
-    private var showOnlyFavorites = false
-    private var isLoading = false
-    private var creatorInfo: UserInfo?
     
     // MARK: - UI Elements
     // Header
@@ -53,14 +40,14 @@ class ModuleDetailViewController: BaseViewController {
     
     private lazy var creatorAvatarImageView: UIImageView = {
         let imageView = UIImageView()
-            imageView.contentMode = .scaleAspectFill
-            imageView.layer.cornerRadius = 15
-            imageView.clipsToBounds = true
-            imageView.translatesAutoresizingMaskIntoConstraints = false
-            imageView.backgroundColor = .clear 
-            imageView.layer.borderWidth = 1
-            imageView.layer.borderColor = UIColor.lightGray.withAlphaComponent(0.3).cgColor
-            return imageView
+        imageView.contentMode = .scaleAspectFill
+        imageView.layer.cornerRadius = 15
+        imageView.clipsToBounds = true
+        imageView.translatesAutoresizingMaskIntoConstraints = false
+        imageView.backgroundColor = .clear
+        imageView.layer.borderWidth = 1
+        imageView.layer.borderColor = UIColor.lightGray.withAlphaComponent(0.3).cgColor
+        return imageView
     }()
     
     private lazy var creatorNameLabel: UILabel = {
@@ -175,12 +162,20 @@ class ModuleDetailViewController: BaseViewController {
         return indicator
     }()
     
+    // MARK: - Properties
+    var module: ModuleResponse!
+    private let viewModel = ModuleDetailViewModel()
+    
     // MARK: - Lifecycle
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
         setupConstraints()
         setupTableView()
+        setupViewModelCallbacks()
+        
+        // Set module in ViewModel and load data
+        viewModel.module = module
         loadModuleDetails()
     }
     
@@ -303,281 +298,92 @@ class ModuleDetailViewController: BaseViewController {
         tableView.register(ModuleTermCell.self, forCellReuseIdentifier: "ModuleTermCell")
     }
     
-    // MARK: - API Methods
-    private func loadModuleDetails() {
-        guard !isLoading else { return }
+    private func setupViewModelCallbacks() {
+        viewModel.onDataUpdated = { [weak self] in
+            self?.updateUI()
+        }
         
-        isLoading = true
-        loadingIndicator.startAnimating()
+        viewModel.onError = { [weak self] message in
+            self?.showError(message: message)
+        }
         
-        updateModuleInfo()
+        viewModel.onModuleDeleted = { [weak self] in
+            self?.showModuleDeletedSuccess()
+        }
         
-        // Load creator info
-        loadCreatorInfo()
+        viewModel.onNavigateToEditModule = { [weak self] module, terms in
+            self?.navigateToEditModule(module, terms: terms)
+        }
         
-        // Load terms
-        NetworkManager.shared.getModuleTerms(moduleId: module.id) { [weak self] result in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                self.isLoading = false
-                self.loadingIndicator.stopAnimating()
-                
-                switch result {
-                case .success(let response):
-                    if response.ok {
-                        self.terms = response.data?.data ?? []
-                        
-                        // Filter terms by moduleId (in case backend returns all terms)
-                        // Only filter if moduleId exists in term response
-                        self.terms = self.terms.filter { term in
-                            guard let termModuleId = term.moduleId else { return true }
-                            return termModuleId == self.module.id
-                        }
-                        
-                        print("✅ Showing \(self.terms.count) terms for module")
-                        
-                        self.updateFilteredTerms()
-                        self.tableView.reloadData()
-                        self.updateEmptyState()
-                        
-                        // Update terms count label with actual count
-                        self.updateTermsCountLabel()
-                        
-                        // Update cards mode button state
-                        self.updateCardsModeButton()
-                    } else {
-                        self.showError(message: response.message)
-                    }
-                    
-                case .failure(let error):
-                    self.showError(message: error.localizedDescription)
-                }
-            }
+        viewModel.onNavigateToCardsMode = { [weak self] module, terms in
+            self?.navigateToCardsMode(module, terms: terms)
+        }
+        
+        viewModel.onNavigateBack = { [weak self] in
+            self?.navigateBack()
+        }
+        
+        viewModel.onUpdateCardsButtonState = { [weak self] isEnabled in
+            self?.updateCardsModeButton(isEnabled)
+        }
+        
+        viewModel.onUpdateEmptyState = { [weak self] shouldShow, message in
+            self?.updateEmptyState(shouldShow: shouldShow, message: message)
         }
     }
     
-    private func updateModuleInfo() {
-        titleLabel.text = module.title
-        termsCountLabel.text = "Loading terms..."
+    // MARK: - UI Updates
+    private func updateUI() {
+        titleLabel.text = viewModel.getModuleTitle()
+        termsCountLabel.text = viewModel.getTermsCountText()
+        
+        // Update creator view
+        if viewModel.hasCreatorInfo {
+            creatorView.isHidden = false
+            creatorNameLabel.text = "Created by \(viewModel.getCreatorName() ?? "Unknown")"
+            
+            // Load avatar if available
+            if let avatarUrl = viewModel.getCreatorAvatarUrl() {
+                loadProfileImage(from: avatarUrl, for: viewModel.creatorInfo!)
+            } else {
+                setPlaceholderAvatar(for: viewModel.creatorInfo!)
+            }
+        } else {
+            creatorView.isHidden = true
+        }
+        
+        tableView.reloadData()
+        loadingIndicator.stopAnimating()
     }
     
-    private func updateTermsCountLabel() {
-        let actualTermsCount = terms.count
-        termsCountLabel.text = "\(actualTermsCount) term\(actualTermsCount == 1 ? "" : "s")"
-    }
-    
-    private func updateCardsModeButton() {
-        if showOnlyFavorites {
+    private func updateCardsModeButton(_ isEnabled: Bool) {
+        if viewModel.shouldShowOnlyFavorites {
             // Show star icon when in Favorites mode
             if let starIcon = cardsModeButton.viewWithTag(999) as? UIImageView {
                 starIcon.isHidden = false
                 starIcon.tintColor = .gray
-            }
-            
-            // Check if there are any favorites
-            let favoriteTerms = terms.filter { $0.isStarred }
-            if favoriteTerms.isEmpty {
-                // Disable button if no favorites
-                cardsModeButton.isEnabled = false
-                cardsModeButton.alpha = 0.5
-            } else {
-                // Enable button if there are favorites
-                cardsModeButton.isEnabled = true
-                cardsModeButton.alpha = 1.0
             }
         } else {
             // Hide star icon when in All mode
             if let starIcon = cardsModeButton.viewWithTag(999) as? UIImageView {
                 starIcon.isHidden = true
             }
-            
-            // Check if there are any terms
-            if terms.isEmpty {
-                cardsModeButton.isEnabled = false
-                cardsModeButton.alpha = 0.5
-            } else {
-                cardsModeButton.isEnabled = true
-                cardsModeButton.alpha = 1.0
-            }
-        }
-    }
-    
-    private func loadCreatorInfo() {
-        // Check if creator is current user
-        if let currentUserId = UserDefaults.standard.string(forKey: "currentUserId"),
-           module.userId == currentUserId {
-            // Get current user info
-            NetworkManager.shared.getUserProfile { [weak self] result in
-                guard let self = self else { return }
-                
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let response):
-                        if response.ok {
-                            self.creatorInfo = UserInfo(from: response.data, isCurrentUser: true)
-                            self.updateCreatorUI()
-                        } else {
-                            // Set default creator info
-                            self.creatorInfo = UserInfo(
-                                id: self.module.userId,
-                                name: "You",
-                                avatarUrl: nil,
-                                isCurrentUser: true
-                            )
-                            self.updateCreatorUI()
-                        }
-                    case .failure:
-                        // Set default creator info
-                        self.creatorInfo = UserInfo(
-                            id: self.module.userId,
-                            name: "You",
-                            avatarUrl: nil,
-                            isCurrentUser: true
-                        )
-                        self.updateCreatorUI()
-                    }
-                }
-            }
-        } else {
-            // For other users, we need to fetch their profile
-            // Since we don't have an endpoint for that yet, show placeholder
-            self.creatorInfo = UserInfo(
-                id: module.userId,
-                name: "Creator",
-                avatarUrl: nil,
-                isCurrentUser: false
-            )
-            self.updateCreatorUI()
-        }
-    }
-    
-    private func updateCreatorUI() {
-        guard let creatorInfo = creatorInfo else {
-            creatorView.isHidden = true
-            return
         }
         
-        creatorView.isHidden = false
-        creatorNameLabel.text = "Created by \(creatorInfo.name)"
-        
-        // Set avatar image
-        if let avatarUrl = creatorInfo.fullAvatarUrl {
-            loadProfileImage(from: avatarUrl, for: creatorInfo)
-        } else {
-            // Fallback to placeholder with first letter or system icon
-            setPlaceholderAvatar(for: creatorInfo)
-        }
+        cardsModeButton.isEnabled = isEnabled
+        cardsModeButton.alpha = isEnabled ? 1.0 : 0.5
     }
     
-    private func loadProfileImage(from url: URL, for creatorInfo: UserInfo) {
-        // Cache key for this specific creator
-        let cacheKey = "creator_\(creatorInfo.id)_avatar"
-        
-        // Check cache first
-        if let cachedImageData = UserDefaults.standard.data(forKey: cacheKey),
-           let cachedImage = UIImage(data: cachedImageData) {
-            creatorAvatarImageView.image = cachedImage
-            creatorAvatarImageView.tintColor = nil // Remove tint color when we have actual image
-            return
-        }
-        // Show placeholder while loading
-            setPlaceholderAvatar(for: creatorInfo)
-            
-            // Download image
-            URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
-                guard let self = self else { return }
-                
-                if let error = error {
-                    print("❌ Error loading creator avatar: \(error)")
-                    DispatchQueue.main.async {
-                        self.setPlaceholderAvatar(for: creatorInfo)
-                    }
-                    return
-                }
-                
-                guard let data = data, let image = UIImage(data: data) else {
-                    print("❌ Invalid image data for creator avatar")
-                    DispatchQueue.main.async {
-                        self.setPlaceholderAvatar(for: creatorInfo)
-                    }
-                    return
-                }
-                
-                DispatchQueue.main.async {
-                    print("✅ Loaded creator avatar for: \(creatorInfo.name)")
-                    
-                    // Set the actual image
-                    self.creatorAvatarImageView.image = image
-                    self.creatorAvatarImageView.tintColor = nil // Remove tint color
-                    
-                    // Cache the image
-                    if let imageData = image.jpegData(compressionQuality: 0.8) {
-                        UserDefaults.standard.set(imageData, forKey: cacheKey)
-                        UserDefaults.standard.synchronize()
-                    }
-                }
-            }.resume()
-        }
-    
-    private func setPlaceholderAvatar(for creatorInfo: UserInfo) {
-        // Use system icon or first letter as fallback
-        if creatorInfo.isCurrentUser {
-            // For current user, use pink system icon
-            creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
-            creatorAvatarImageView.tintColor = .pinkButton
-        } else {
-            // For other users, try to show first letter or generic icon
-            if let firstLetter = creatorInfo.name.first {
-                // Create a label-based avatar
-                let label = UILabel()
-                label.text = String(firstLetter).uppercased()
-                label.textAlignment = .center
-                label.font = .systemFont(ofSize: 12, weight: .bold)
-                label.textColor = .white
-                label.backgroundColor = .gray
-                label.frame = CGRect(x: 0, y: 0, width: 30, height: 30)
-                label.layer.cornerRadius = 15
-                label.layer.masksToBounds = true
-                
-                // Convert label to image
-                UIGraphicsBeginImageContextWithOptions(label.bounds.size, false, 0.0)
-                label.layer.render(in: UIGraphicsGetCurrentContext()!)
-                let image = UIGraphicsGetImageFromCurrentImageContext()
-                UIGraphicsEndImageContext()
-                
-                creatorAvatarImageView.image = image
-                creatorAvatarImageView.tintColor = nil
-            } else {
-                // Fallback to generic icon
-                creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
-                creatorAvatarImageView.tintColor = .gray
-            }
-        }
-    }
-
-    
-    private func updateFilteredTerms() {
-        if showOnlyFavorites {
-            filteredTerms = terms.filter { $0.isStarred }
-        } else {
-            filteredTerms = terms
-        }
-        updateEmptyState()
+    private func updateEmptyState(shouldShow: Bool, message: String) {
+        tableView.isHidden = shouldShow
+        emptyStateView.isHidden = !shouldShow
+        emptyStateLabel.text = message
     }
     
-    private func updateEmptyState() {
-        let isEmpty = filteredTerms.isEmpty
-        tableView.isHidden = isEmpty
-        emptyStateView.isHidden = !isEmpty
-        
-        if isEmpty {
-            if terms.isEmpty {
-                emptyStateLabel.text = "No terms yet"
-            } else if showOnlyFavorites {
-                emptyStateLabel.text = "No favorite terms"
-            }
-        }
+    // MARK: - API Methods
+    private func loadModuleDetails() {
+        loadingIndicator.startAnimating()
+        viewModel.loadModuleDetails()
     }
     
     // MARK: - Actions
@@ -591,43 +397,24 @@ class ModuleDetailViewController: BaseViewController {
     }
     
     @objc private func cardsModeTapped() {
-        print("🎯 Cards button tapped - Mode: \(showOnlyFavorites ? "Favorites" : "All")")
-        
-        // Get the terms to show based on current filter
-        let termsToShow = showOnlyFavorites ? terms.filter { $0.isStarred } : terms
-        
-        // Check if there are terms to show
-        if termsToShow.isEmpty {
-            if showOnlyFavorites {
-                // Show alert for no favorites
-                let alert = UIAlertController(
-                    title: "No Favorite Terms",
-                    message: "You don't have any favorite terms in this module. Add some favorites first to use Cards Mode with favorites.",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                present(alert, animated: true)
-            } else {
-                // Show alert for no terms at all
-                let alert = UIAlertController(
-                    title: "No Terms",
-                    message: "This module doesn't have any terms yet. Add some terms first to use Cards Mode.",
-                    preferredStyle: .alert
-                )
-                alert.addAction(UIAlertAction(title: "OK", style: .default))
-                present(alert, animated: true)
-            }
-            return
-        }
-        
-        // Open cards mode with filtered terms
+        print("🎯 Cards button tapped")
+        viewModel.navigateToCardsMode()
+    }
+    
+    @objc private func filterChanged() {
+        viewModel.toggleFavoriteFilter()
+        filterSegmentedControl.selectedSegmentIndex = viewModel.shouldShowOnlyFavorites ? 1 : 0
+    }
+    
+    // MARK: - Navigation Methods
+    private func navigateToCardsMode(_ module: ModuleResponse, terms: [TermResponse]) {
         let cardsVC = CardsModeViewController()
         cardsVC.module = module
-        cardsVC.terms = termsToShow
+        cardsVC.terms = terms
         
         // Add callback to refresh terms when returning
         cardsVC.onFavoriteUpdate = { [weak self] in
-            self?.loadModuleDetails() // Reload terms to get updated favorites
+            self?.loadModuleDetails()
         }
         
         if let navController = navigationController {
@@ -638,18 +425,29 @@ class ModuleDetailViewController: BaseViewController {
         }
     }
     
-    @objc private func filterChanged() {
-        showOnlyFavorites = filterSegmentedControl.selectedSegmentIndex == 1
-        updateFilteredTerms()
-        tableView.reloadData()
-        updateCardsModeButton() // Update button when filter changes
+    private func navigateToEditModule(_ module: ModuleResponse, terms: [TermResponse]) {
+        let editVC = EditModuleViewController()
+        editVC.module = module
+        editVC.terms = terms
+        
+        editVC.onModuleUpdated = { [weak self] updatedModule in
+            self?.viewModel.updateModule(updatedModule)
+        }
+        
+        editVC.onTermsUpdated = { [weak self] updatedTerms in
+            self?.viewModel.updateTerms(updatedTerms)
+        }
+        
+        let navController = UINavigationController(rootViewController: editVC)
+        navController.modalPresentationStyle = .fullScreen
+        present(navController, animated: true)
     }
     
     private func showModuleMenu() {
         let alert = UIAlertController(title: nil, message: nil, preferredStyle: .actionSheet)
         
         let editAction = UIAlertAction(title: "Edit Module", style: .default) { [weak self] _ in
-            self?.editModule()
+            self?.viewModel.editModule()
         }
         
         let deleteAction = UIAlertAction(title: "Delete Module", style: .destructive) { [weak self] _ in
@@ -665,29 +463,6 @@ class ModuleDetailViewController: BaseViewController {
         present(alert, animated: true)
     }
     
-    private func editModule() {
-        let editVC = EditModuleViewController()
-        editVC.module = module
-        editVC.terms = terms
-        
-        editVC.onModuleUpdated = { [weak self] updatedModule in
-            self?.module = updatedModule
-            self?.titleLabel.text = updatedModule.title
-        }
-        
-        editVC.onTermsUpdated = { [weak self] updatedTerms in
-            self?.terms = updatedTerms
-            self?.updateFilteredTerms()
-            self?.tableView.reloadData()
-            self?.updateTermsCountLabel()
-            self?.updateCardsModeButton()
-        }
-        
-        let navController = UINavigationController(rootViewController: editVC)
-        navController.modalPresentationStyle = .fullScreen
-        present(navController, animated: true)
-    }
-    
     private func deleteModule() {
         let alert = UIAlertController(
             title: "Delete Module",
@@ -701,100 +476,30 @@ class ModuleDetailViewController: BaseViewController {
         })
         
         present(alert, animated: true)
-        
     }
     
     private func confirmDeleteModule() {
         loadingIndicator.startAnimating()
-        
-        NetworkManager.shared.deleteModule(moduleId: module.id) { [weak self] result in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                self.loadingIndicator.stopAnimating()
-                
-                switch result {
-                case .success(let response):
-                    if response.ok {
-                        // Show success message
-                        let alert = UIAlertController(
-                            title: "Success",
-                            message: "Module deleted successfully",
-                            preferredStyle: .alert
-                        )
-                        alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in
-                            self.navigateBack()
-                        })
-                        self.present(alert, animated: true)
-                    } else {
-                        self.showError(message: response.message)
-                    }
-                    
-                case .failure(let error):
-                    self.showError(message: error.localizedDescription)
-                }
-            }
-        }
+        viewModel.deleteModule()
     }
     
-    private func toggleFavorite(for term: TermResponse, at indexPath: IndexPath) {
-        let newFavoriteStatus = !term.isStarred
+    private func showModuleDeletedSuccess() {
+        loadingIndicator.stopAnimating()
         
-        print("⭐ Toggling favorite for term: \(term.term) to \(newFavoriteStatus)")
-        
-        // Update locally first for immediate UI feedback
-        if let index = terms.firstIndex(where: { $0.id == term.id }) {
-            terms[index].isStarred = newFavoriteStatus
-            updateFilteredTerms()
-            
-            // Update the specific cell
-            if let cell = tableView.cellForRow(at: indexPath) as? ModuleTermCell {
-                cell.configure(with: terms[index])
-            }
-            
-            // Update cards mode button state
-            updateCardsModeButton()
-        }
-        
-        // Call API to update on server
-        NetworkManager.shared.updateTermFavorite(termId: term.id, isStarred: newFavoriteStatus) { [weak self] result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let updatedTerm):
-                    print("✅ Favorite updated successfully")
-                    
-                    // Update local data with server response
-                    if let index = self?.terms.firstIndex(where: { $0.id == term.id }) {
-                        self?.terms[index] = updatedTerm
-                        self?.updateFilteredTerms()
-                        self?.updateCardsModeButton()
-                    }
-                    
-                case .failure(let error):
-                    print("❌ Failed to update favorite: \(error)")
-                    
-                    // Revert local change if API call failed
-                    if let index = self?.terms.firstIndex(where: { $0.id == term.id }) {
-                        self?.terms[index].isStarred = term.isStarred // Revert to original
-                        self?.updateFilteredTerms()
-                        
-                        // Update cell to show original state
-                        if let cell = self?.tableView.cellForRow(at: indexPath) as? ModuleTermCell {
-                            cell.configure(with: self!.terms[index])
-                        }
-                        
-                        // Update cards mode button state
-                        self?.updateCardsModeButton()
-                        
-                        // Show error to user
-                        self?.showError(message: "Failed to update favorite: \(error.localizedDescription)")
-                    }
-                }
-            }
-        }
+        let alert = UIAlertController(
+            title: "Success",
+            message: "Module deleted successfully",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
+            self?.navigateBack()
+        })
+        present(alert, animated: true)
     }
     
     private func showError(message: String) {
+        loadingIndicator.stopAnimating()
+        
         let alert = UIAlertController(
             title: "Error",
             message: message,
@@ -807,25 +512,99 @@ class ModuleDetailViewController: BaseViewController {
     private func navigateBack() {
         print("🔙 Navigating back")
         
-        // If presented modally (from Library)
         if let navigationController = navigationController, navigationController.presentingViewController != nil {
             print("📱 Dismissing modally")
             navigationController.dismiss(animated: true)
-        }
-        // If pushed in a navigation stack
-        else if let navController = navigationController {
+        } else if let navController = navigationController {
             print("⬅️ Popping from navigation stack")
             navController.popViewController(animated: true)
-        }
-        // If directly presented
-        else if presentingViewController != nil {
+        } else if presentingViewController != nil {
             print("📱 Dismissing directly")
             dismiss(animated: true)
-        }
-        // Fallback
-        else {
+        } else {
             print("❌ Couldn't determine how to go back")
             dismiss(animated: true)
+        }
+    }
+    
+    // MARK: - Avatar Methods (Keep these in VC since they're UI-specific)
+    private func loadProfileImage(from url: URL, for creatorInfo: UserInfo) {
+        let cacheKey = "creator_\(creatorInfo.id)_avatar"
+        
+        // Check cache first
+        if let cachedImageData = UserDefaults.standard.data(forKey: cacheKey),
+           let cachedImage = UIImage(data: cachedImageData) {
+            creatorAvatarImageView.image = cachedImage
+            creatorAvatarImageView.tintColor = nil
+            return
+        }
+        
+        // Show placeholder while loading
+        setPlaceholderAvatar(for: creatorInfo)
+        
+        // Download image
+        URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
+            guard let self = self else { return }
+            
+            if let error = error {
+                print("❌ Error loading creator avatar: \(error)")
+                DispatchQueue.main.async {
+                    self.setPlaceholderAvatar(for: creatorInfo)
+                }
+                return
+            }
+            
+            guard let data = data, let image = UIImage(data: data) else {
+                print("❌ Invalid image data for creator avatar")
+                DispatchQueue.main.async {
+                    self.setPlaceholderAvatar(for: creatorInfo)
+                }
+                return
+            }
+            
+            DispatchQueue.main.async {
+                print("✅ Loaded creator avatar for: \(creatorInfo.name)")
+                
+                // Set the actual image
+                self.creatorAvatarImageView.image = image
+                self.creatorAvatarImageView.tintColor = nil
+                
+                // Cache the image
+                if let imageData = image.jpegData(compressionQuality: 0.8) {
+                    UserDefaults.standard.set(imageData, forKey: cacheKey)
+                    UserDefaults.standard.synchronize()
+                }
+            }
+        }.resume()
+    }
+    
+    private func setPlaceholderAvatar(for creatorInfo: UserInfo) {
+        if creatorInfo.isCurrentUser {
+            creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
+            creatorAvatarImageView.tintColor = .pinkButton
+        } else {
+            if let firstLetter = creatorInfo.name.first {
+                let label = UILabel()
+                label.text = String(firstLetter).uppercased()
+                label.textAlignment = .center
+                label.font = .systemFont(ofSize: 12, weight: .bold)
+                label.textColor = .white
+                label.backgroundColor = .gray
+                label.frame = CGRect(x: 0, y: 0, width: 30, height: 30)
+                label.layer.cornerRadius = 15
+                label.layer.masksToBounds = true
+                
+                UIGraphicsBeginImageContextWithOptions(label.bounds.size, false, 0.0)
+                label.layer.render(in: UIGraphicsGetCurrentContext()!)
+                let image = UIGraphicsGetImageFromCurrentImageContext()
+                UIGraphicsEndImageContext()
+                
+                creatorAvatarImageView.image = image
+                creatorAvatarImageView.tintColor = nil
+            } else {
+                creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
+                creatorAvatarImageView.tintColor = .gray
+            }
         }
     }
 }
@@ -833,33 +612,33 @@ class ModuleDetailViewController: BaseViewController {
 // MARK: - UITableViewDelegate
 extension ModuleDetailViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        return filteredTerms.count
+        return viewModel.numberOfTerms
     }
     
     func numberOfSections(in tableView: UITableView) -> Int {
-        return 1  // Only one section
+        return 1
     }
     
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "ModuleTermCell", for: indexPath) as! ModuleTermCell
-        let term = filteredTerms[indexPath.row]
-        cell.configure(with: term)
         
-        cell.onStarTapped = { [weak self] in
-            self?.toggleFavorite(for: term, at: indexPath)
+        if let term = viewModel.getTerm(at: indexPath) {
+            cell.configure(with: term)
+            
+            cell.onStarTapped = { [weak self] in
+                self?.viewModel.toggleFavorite(for: term.id)
+            }
         }
         
         return cell
     }
     
-    // Add space between cells
     func tableView(_ tableView: UITableView, heightForHeaderInSection section: Int) -> CGFloat {
-        return 0  // No section header
+        return 0
     }
     
-    // This adds space between rows
     func tableView(_ tableView: UITableView, heightForFooterInSection section: Int) -> CGFloat {
-        return 10  // Space between cells
+        return 10
     }
     
     func tableView(_ tableView: UITableView, viewForFooterInSection section: Int) -> UIView? {
@@ -868,12 +647,10 @@ extension ModuleDetailViewController: UITableViewDataSource, UITableViewDelegate
         return footerView
     }
     
-    // Make cells unselectable
     func tableView(_ tableView: UITableView, shouldHighlightRowAt indexPath: IndexPath) -> Bool {
-        return false  // Disable cell highlighting/selection
+        return false
     }
     
-    // Remove cell selection
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         // Do nothing - cells are not selectable
     }

@@ -258,13 +258,16 @@ class LibraryViewController: BaseViewController {
     }
     
     private func updateEmptyState(shouldShow: Bool, message: String) {
-        tableView.isHidden = shouldShow
-        emptyStateView.isHidden = !shouldShow
-        emptyStateLabel.text = message
-        
-        if !shouldShow {
-            loadingIndicator.stopAnimating()
-            refreshControl.endRefreshing()
+        DispatchQueue.main.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.tableView.isHidden = shouldShow
+            self.emptyStateView.isHidden = !shouldShow
+            self.emptyStateLabel.text = message
+            
+            // Always stop loading indicators when updating empty state
+            self.loadingIndicator.stopAnimating()
+            self.refreshControl.endRefreshing()
         }
     }
     
