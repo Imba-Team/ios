@@ -206,43 +206,7 @@ class CreateSetViewController: BaseViewController {
     }
     
     private func bindViewModel() {
-        viewModel.onTermsUpdated = { [weak self] in
-            self?.updateTableViewHeight()
-            self?.tableView.reloadData()
-        }
-        
-        viewModel.onValidationError = { [weak self] message in
-            self?.showAlert(message: message)
-        }
-        
-        viewModel.onModuleCreationStarted = { [weak self] in
-            self?.showLoadingIndicator(true)
-        }
-        
-        viewModel.onModuleCreationSuccess = { [weak self] moduleId in
-            self?.viewModel.addTermsToModule(moduleId: moduleId)
-        }
-        
-        viewModel.onModuleCreationFailure = { [weak self] message in
-            self?.showLoadingIndicator(false)
-            self?.showAlert(message: message)
-        }
-        
-        viewModel.onTermsAdditionComplete = { [weak self] successfulTerms, errors in
-            self?.showLoadingIndicator(false)
-            
-            if errors.isEmpty {
-                let message = "✅ Module created with \(successfulTerms) terms!"
-                self?.showSuccessAlert(message: message)
-                self?.viewModel.resetForm()
-                self?.resetUI()
-            } else {
-                let errorMessage = "Module created but \(errors.count) terms failed:\n" + errors.joined(separator: "\n")
-                self?.showAlert(message: errorMessage)
-                self?.viewModel.resetForm()
-                self?.resetUI()
-            }
-        }
+        viewModel.delegate = self
     }
     
     override func viewDidLayoutSubviews() {
@@ -453,3 +417,55 @@ extension CreateSetViewController: UITableViewDataSource, UITableViewDelegate {
         return cell
     }
 }
+
+extension CreateSetViewController: CreateSetViewModelDelegate {
+    func onTermsUpdated() {
+        
+        self.updateTableViewHeight()
+        self.tableView.reloadData()
+    }
+    
+    func onValidationError(_ message: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.showAlert(message: message)
+        }
+    }
+    
+    func onModuleCreationStarted() {
+        DispatchQueue.main.async { [weak self] in
+            self?.showLoadingIndicator(true)
+        }
+    }
+    
+    func onModuleCreationSuccess(_ moduleId: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.viewModel.addTermsToModule(moduleId: moduleId)
+        }
+    }
+    
+    func onModuleCreationFailure(_ message: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.showLoadingIndicator(false)
+            self?.showAlert(message: message)
+        }
+    }
+    
+    func onTermsAdditionComplete(numberOfSuccess successfulTerms: Int, errors: [String]) {
+        DispatchQueue.main.async { [weak self] in
+            self?.showLoadingIndicator(false)
+            
+            if errors.isEmpty {
+                let message = "✅ Module created with \(successfulTerms) terms!"
+                self?.showSuccessAlert(message: message)
+                self?.viewModel.resetForm()
+                self?.resetUI()
+            } else {
+                let errorMessage = "Module created but \(errors.count) terms failed:\n" + errors.joined(separator: "\n")
+                self?.showAlert(message: errorMessage)
+                self?.viewModel.resetForm()
+                self?.resetUI()
+            }
+        }
+    }
+}
+

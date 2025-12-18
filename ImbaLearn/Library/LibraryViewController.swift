@@ -216,21 +216,7 @@ class LibraryViewController: BaseViewController {
     }
     
     private func setupViewModelCallbacks() {
-        viewModel.onDataUpdated = { [weak self] in
-            self?.tableView.reloadData()
-        }
-        
-        viewModel.onError = { [weak self] message in
-            self?.showError(message: message)
-        }
-        
-        viewModel.onNavigateToModuleDetail = { [weak self] module in
-            self?.navigateToModuleDetail(with: module)
-        }
-        
-        viewModel.onUpdateEmptyState = { [weak self] shouldShow, message in
-            self?.updateEmptyState(shouldShow: shouldShow, message: message)
-        }
+        viewModel.delegate = self
     }
     
     // MARK: - Actions
@@ -360,7 +346,27 @@ extension LibraryViewController: UITableViewDataSource, UITableViewDelegate {
         tableView.deselectRow(at: indexPath, animated: true)
         
         if let module = viewModel.getModule(at: indexPath) {
-            viewModel.onNavigateToModuleDetail?(module)
+            // Call the delegate directly
+            viewModel.delegate?.onNavigateToModuleDetail(module)
         }
+    }
+}
+
+// MARK: - LibraryViewModelDelegate
+extension LibraryViewController: LibraryViewModelDelegate {
+    func onDataUpdated() {
+        tableView.reloadData()
+    }
+    
+    func onError(_ message: String) {
+        showError(message: message)
+    }
+    
+    func onNavigateToModuleDetail(_ moduleResponse: ModuleResponse) {
+        navigateToModuleDetail(with: moduleResponse)
+    }
+    
+    func onUpdateEmptyState(_ isEmpty: Bool, message: String) {
+        updateEmptyState(shouldShow: isEmpty, message: message)
     }
 }

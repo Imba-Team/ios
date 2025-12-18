@@ -1,18 +1,14 @@
-//
-//  CardsModeViewController.swift
-//  ImbaLearn
-//
-//  Created by Leyla Aliyeva on 18.11.25.
-//
 
 import UIKit
 
 class CardsModeViewController: BaseViewController {
     
     // MARK: - Properties
-    var module: ModuleResponse?
-    var terms: [TermResponse] = []
-    var onFavoriteUpdate: (() -> Void)? // Callback to update parent
+    private var viewModel: CardsModeViewModel
+    var onFavoriteUpdate: (() -> Void)? {
+        get { viewModel.onFavoriteUpdate }
+        set { viewModel.onFavoriteUpdate = newValue }
+    }
     
     // MARK: - UI Elements
     private lazy var closeButton: UIButton = {
@@ -72,14 +68,23 @@ class CardsModeViewController: BaseViewController {
     }()
     
     // MARK: - Private Properties
-    private var currentIndex: Int = 0 {
-        didSet {
-            updateProgressLabel()
-            updateAllCards()
-        }
+    private var panGesture: UIPanGestureRecognizer!
+    
+    // MARK: - Initialization
+    init(viewModel: CardsModeViewModel) {
+        self.viewModel = viewModel
+        super.init(nibName: nil, bundle: nil)
+        setupViewModelBindings()
     }
     
-    private var panGesture: UIPanGestureRecognizer!
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+    
+    convenience init(module: ModuleResponse? = nil, terms: [TermResponse] = []) {
+        let viewModel = CardsModeViewModel(module: module, terms: terms)
+        self.init(viewModel: viewModel)
+    }
     
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -92,8 +97,8 @@ class CardsModeViewController: BaseViewController {
         loadingIndicator.startAnimating()
         
         // Load terms if module is provided but terms array is empty
-        if let module = module, terms.isEmpty {
-            loadTerms(for: module)
+        if viewModel.module != nil && viewModel.isEmptyState {
+            viewModel.loadTerms()
         } else {
             loadingIndicator.stopAnimating()
             updateAllCards()
@@ -107,6 +112,7 @@ class CardsModeViewController: BaseViewController {
         onFavoriteUpdate?()
     }
     
+    // MARK: - Setup Methods
     private func setupUI() {
         view.backgroundColor = .background
         
@@ -165,6 +171,17 @@ class CardsModeViewController: BaseViewController {
         ])
     }
     
+    private func setupViewModelBindings() {
+        viewModel.delegate = self
+        viewModel.onCurrentIndexChange = { [weak self] _ in
+            self?.updateProgressLabel()
+            self?.updateAllCards()
+        }
+        viewModel.onTermsEmpty = { [weak self] in
+            self?.showEmptyState()
+        }
+    }
+    
     private func setupGestures() {
         // Pan gesture for swiping left/right
         panGesture = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
@@ -182,45 +199,9 @@ class CardsModeViewController: BaseViewController {
         nextCardView.addGestureRecognizer(nextTapGesture)
     }
     
-    // MARK: - API Methods
-    private func loadTerms(for module: ModuleResponse) {
-        NetworkManager.shared.getModuleTerms(moduleId: module.id) { [weak self] result in
-            guard let self = self else { return }
-            
-            DispatchQueue.main.async {
-                self.loadingIndicator.stopAnimating()
-                
-                switch result {
-                case .success(let response):
-                    if response.ok {
-                        self.terms = response.data?.data ?? []
-                        self.updateAllCards()
-                        self.updateProgressLabel()
-                        
-                        print("✅ Loaded \(self.terms.count) terms for cards mode")
-                    } else {
-                        print("Failed to load terms: \(response.message)")
-                        self.showEmptyState()
-                    }
-                case .failure(let error):
-                    print("Error loading terms: \(error)")
-                    self.showEmptyState()
-                }
-            }
-        }
-    }
-    
-    private func showEmptyState() {
-        currentCardView.configure(term: "No terms", definition: "Add terms to this module to start studying", isFavorite: false)
-        currentCardView.favoriteButton.isHidden = true
-        previousCardView.isHidden = true
-        nextCardView.isHidden = true
-        progressLabel.text = "0 / 0"
-    }
-    
     // MARK: - Card Management
     private func updateAllCards() {
-        guard !terms.isEmpty else {
+        guard !viewModel.isEmptyState else {
             showEmptyState()
             return
         }
@@ -233,9 +214,8 @@ class CardsModeViewController: BaseViewController {
     }
     
     private func updateCurrentCard() {
-        guard currentIndex < terms.count else { return }
+        guard let term = viewModel.currentTerm else { return }
         
-        let term = terms[currentIndex]
         configureCardView(currentCardView, with: term)
         currentCardView.favoriteButton.isHidden = false
         currentCardView.favoriteButton.addTarget(self, action: #selector(favoriteTapped), for: .touchUpInside)
@@ -243,17 +223,17 @@ class CardsModeViewController: BaseViewController {
     
     private func updateSideCards() {
         // Show/hide previous card
-        if currentIndex > 0 {
+        if let previousTerm = viewModel.previousTerm {
             previousCardView.isHidden = false
-            configureCardView(previousCardView, with: terms[currentIndex - 1])
+            configureCardView(previousCardView, with: previousTerm)
         } else {
             previousCardView.isHidden = true
         }
         
         // Show/hide next card
-        if currentIndex < terms.count - 1 {
+        if let nextTerm = viewModel.nextTerm {
             nextCardView.isHidden = false
-            configureCardView(nextCardView, with: terms[currentIndex + 1])
+            configureCardView(nextCardView, with: nextTerm)
         } else {
             nextCardView.isHidden = true
         }
@@ -267,6 +247,14 @@ class CardsModeViewController: BaseViewController {
         )
     }
     
+    private func showEmptyState() {
+        currentCardView.configure(term: "No terms", definition: "Add terms to this module to start studying", isFavorite: false)
+        currentCardView.favoriteButton.isHidden = true
+        previousCardView.isHidden = true
+        nextCardView.isHidden = true
+        progressLabel.text = "0 / 0"
+    }
+    
     // MARK: - Actions
     @objc private func closeTapped() {
         dismiss(animated: true)
@@ -277,112 +265,54 @@ class CardsModeViewController: BaseViewController {
     }
     
     @objc private func previousCardTapped() {
-        if currentIndex > 0 {
-            navigateToCard(at: currentIndex - 1, direction: .left)
+        if viewModel.navigateLeft() {
+            navigateToCard(direction: .left)
         }
     }
     
     @objc private func nextCardTapped() {
-        if currentIndex < terms.count - 1 {
-            navigateToCard(at: currentIndex + 1, direction: .right)
+        if viewModel.navigateRight() {
+            navigateToCard(direction: .right)
         }
     }
     
     @objc private func favoriteTapped() {
-        guard currentIndex < terms.count else { return }
-        
-        let term = terms[currentIndex]
-        let newFavoriteStatus = !term.isStarred
-        
-        print("⭐ Cards mode: Toggling favorite for term: \(term.term) to \(newFavoriteStatus)")
-        
-        // Update locally first
-        terms[currentIndex].isStarred = newFavoriteStatus
-        
-        // Update UI immediately
-        currentCardView.updateFavoriteButton(isFavorited: newFavoriteStatus)
-        
-        // Call API to update on server
-        NetworkManager.shared.updateTermFavorite(termId: term.id, isStarred: newFavoriteStatus) { [weak self] result in
-            DispatchQueue.main.async {
-                switch result {
-                case .success(let updatedTerm):
-                    print("✅ Cards mode: Favorite updated successfully")
-                    // Update local data with server response
-                    if let currentIndex = self?.currentIndex {
-                        self?.terms[currentIndex] = updatedTerm
-                    }
-                    
-                    // Update the callback to refresh parent
-                    self?.onFavoriteUpdate?()
-                    
-                case .failure(let error):
-                    print("❌ Cards mode: Failed to update favorite: \(error)")
-                    
-                    // Revert local change
-                    if let currentIndex = self?.currentIndex {
-                        self?.terms[currentIndex].isStarred = term.isStarred // Revert
-                        self?.currentCardView.updateFavoriteButton(isFavorited: term.isStarred)
-                        
-                        // Show error
-                        let alert = UIAlertController(
-                            title: "Error",
-                            message: "Failed to update favorite",
-                            preferredStyle: .alert
-                        )
-                        alert.addAction(UIAlertAction(title: "OK", style: .default))
-                        self?.present(alert, animated: true)
-                    }
-                }
-            }
-        }
+        viewModel.toggleFavoriteForCurrentTerm()
     }
     
     @objc private func handlePan(_ gesture: UIPanGestureRecognizer) {
-        guard !terms.isEmpty else { return }
-
+        guard !viewModel.isEmptyState else { return }
+        
         let translation = gesture.translation(in: cardContainer)
         let velocity = gesture.velocity(in: cardContainer)
-
+        
         switch gesture.state {
-
         case .began, .changed:
-            var limitedTranslationX = translation.x
-
-            // Prevent swiping left on first card
-            if currentIndex == 0 && translation.x > 0 {
-                limitedTranslationX = min(translation.x, 50)
-            }
-
-            // Prevent swiping right on last card
-            if currentIndex == terms.count - 1 && translation.x < 0 {
-                limitedTranslationX = max(translation.x, -50)
-            }
-
+            let limitedTranslationX = viewModel.calculateLimitedTranslation(translation.x)
+            
             // Smooth, stutter-free dragging
             UIView.performWithoutAnimation {
                 self.currentCardView.transform =
-                    CGAffineTransform(translationX: limitedTranslationX, y: 0)
+                CGAffineTransform(translationX: limitedTranslationX, y: 0)
             }
-
+            
             // Dim based on distance
-            let swipePercentage = min(abs(translation.x) / 150, 1.0)
-            currentCardView.alpha = 1.0 - (swipePercentage * 0.5)
-
+            let alpha = viewModel.calculateAlpha(for: limitedTranslationX)
+            currentCardView.alpha = alpha
+            
         case .ended, .cancelled:
-            let swipeThreshold: CGFloat = 100
-            let velocityThreshold: CGFloat = 500
-
-            let shouldSwipe = abs(translation.x) > swipeThreshold ||
-                              abs(velocity.x) > velocityThreshold
-
-            let canSwipeLeft = translation.x > 0 && currentIndex > 0
-            let canSwipeRight = translation.x < 0 && currentIndex < terms.count - 1
-
-            if shouldSwipe && (canSwipeLeft || canSwipeRight) {
-                let direction: CGFloat = translation.x > 0 ? 1 : -1
-                let throwDistance = direction * cardContainer.bounds.width
-
+            let (shouldSwipe, direction) = viewModel.calculateSwipeParameters(
+                translation: translation.x,
+                velocity: velocity.x,
+                cardContainerWidth: cardContainer.bounds.width
+            )
+            
+            if shouldSwipe, let direction = direction {
+                let throwDistance = viewModel.getThrowDistance(
+                    for: direction,
+                    cardContainerWidth: cardContainer.bounds.width
+                )
+                
                 // FAST + SMOOTH EXIT ANIMATION
                 UIView.animate(
                     withDuration: 0.22,
@@ -397,17 +327,18 @@ class CardsModeViewController: BaseViewController {
                     )
                     self.currentCardView.alpha = 0
                 } completion: { _ in
-                    let newIndex = direction > 0
-                        ? self.currentIndex - 1
-                        : self.currentIndex + 1
-
-                    self.currentIndex = newIndex
-
+                    // Navigate based on direction
+                    if direction > 0 {
+                        _ = self.viewModel.navigateLeft()
+                    } else {
+                        _ = self.viewModel.navigateRight()
+                    }
+                    
                     // Reset instantly for next card
                     self.currentCardView.transform = .identity
                     self.currentCardView.alpha = 1
                 }
-
+                
             } else {
                 // CANCEL SWIPE — snap back smoothly
                 UIView.animate(
@@ -421,34 +352,27 @@ class CardsModeViewController: BaseViewController {
                     self.currentCardView.alpha = 1
                 }
             }
-
+            
         default:
             break
         }
     }
-
     
     private enum NavigationDirection {
         case left, right
     }
     
-    private func navigateToCard(at index: Int, direction: NavigationDirection) {
-        guard index >= 0 && index < terms.count else { return }
-        
+    private func navigateToCard(direction: NavigationDirection) {
         // Animate the transition
         UIView.animate(withDuration: 0.22, delay: 0, options: .curveEaseInOut, animations: {
             // Move current card out
             let exitTransform = direction == .left ?
-                CGAffineTransform(translationX: -self.cardContainer.bounds.width, y: 0) :
-                CGAffineTransform(translationX: self.cardContainer.bounds.width, y: 0)
+            CGAffineTransform(translationX: -self.cardContainer.bounds.width, y: 0) :
+            CGAffineTransform(translationX: self.cardContainer.bounds.width, y: 0)
             self.currentCardView.transform = exitTransform
             self.currentCardView.alpha = 0
             
             // Bring new card in
-            let entryTransform = direction == .left ?
-                CGAffineTransform(translationX: self.cardContainer.bounds.width, y: 0) :
-                CGAffineTransform(translationX: -self.cardContainer.bounds.width, y: 0)
-            
             if direction == .left {
                 self.previousCardView.transform = .identity
                 self.previousCardView.alpha = 1
@@ -457,9 +381,6 @@ class CardsModeViewController: BaseViewController {
                 self.nextCardView.alpha = 1
             }
         }) { _ in
-            // Update index
-            self.currentIndex = index
-            
             // Reset transforms
             self.currentCardView.transform = .identity
             self.currentCardView.alpha = 1
@@ -481,6 +402,40 @@ class CardsModeViewController: BaseViewController {
     
     // MARK: - Helper Methods
     private func updateProgressLabel() {
-        progressLabel.text = "\(currentIndex + 1) / \(terms.count)"
+        progressLabel.text = viewModel.progressText
+    }
+}
+
+// MARK: - CardsModeViewModelDelegate
+extension CardsModeViewController: CardsModeViewModelDelegate {
+    func didLoadTerms(terms: [TermResponse]) {
+        loadingIndicator.stopAnimating()
+        updateAllCards()
+        updateProgressLabel()
+        print("✅ Loaded \(terms.count) terms for cards mode")
+    }
+    
+    func didFailToLoadTerms(error: String) {
+        loadingIndicator.stopAnimating()
+        showEmptyState()
+        print("Failed to load terms: \(error)")
+    }
+    
+    func didUpdateFavoriteStatus(at index: Int, isStarred: Bool) {
+        // Update UI immediately
+        if let currentTerm = viewModel.currentTerm, index == viewModel.currentIndex {
+            currentCardView.updateFavoriteButton(isFavorited: currentTerm.isStarred)
+        }
+    }
+    
+    func didFailToUpdateFavorite(error: String) {
+        // Show error
+        let alert = UIAlertController(
+            title: "Error",
+            message: "Failed to update favorite",
+            preferredStyle: .alert
+        )
+        alert.addAction(UIAlertAction(title: "OK", style: .default))
+        present(alert, animated: true)
     }
 }

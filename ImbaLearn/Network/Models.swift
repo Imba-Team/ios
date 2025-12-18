@@ -46,37 +46,63 @@ struct UserProfileData: Codable {
 }
 
 // MARK: - User Info Model (for UI display)
-struct UserInfo: Codable {
+//struct UserInfo: Codable {
+//    let id: String
+//    let name: String
+//    let avatarUrl: String?
+//    let isCurrentUser: Bool
+//    
+//    var fullAvatarUrl: URL? {
+//        guard let avatarUrl = avatarUrl, !avatarUrl.isEmpty else { return nil }
+//        
+//        // If it's already a full URL, return it
+//        if avatarUrl.hasPrefix("http") {
+//            return URL(string: avatarUrl)
+//        }
+//        
+//        // If it's a relative path, construct the full URL
+//        return URL(string: "https://imba-server.up.railway.app" + avatarUrl)
+//    }
+//    
+//    init(id: String, name: String, avatarUrl: String? = nil, isCurrentUser: Bool = false) {
+//        self.id = id
+//        self.name = name
+//        self.avatarUrl = avatarUrl
+//        self.isCurrentUser = isCurrentUser
+//    }
+//    
+//    // Convenience initializer from UserProfileData
+//    init(from profileData: UserProfileData, isCurrentUser: Bool = true) {
+//        self.id = profileData.id
+//        self.name = profileData.name
+//        self.avatarUrl = profileData.profilePicture
+//        self.isCurrentUser = isCurrentUser
+//    }
+//}
+
+struct UserInfo {
     let id: String
     let name: String
-    let avatarUrl: String?
+    let avatarUrl: String?  // This should be the path like "/uploads/profile.jpg"
     let isCurrentUser: Bool
     
+    // Computed property to get full URL
     var fullAvatarUrl: URL? {
-        guard let avatarUrl = avatarUrl, !avatarUrl.isEmpty else { return nil }
+        guard let avatarUrl = avatarUrl, !avatarUrl.isEmpty else {
+            print("⚠️ No avatar URL for user: \(name)")
+            return nil
+        }
         
-        // If it's already a full URL, return it
+        // If it's already a full URL, use it
         if avatarUrl.hasPrefix("http") {
             return URL(string: avatarUrl)
         }
         
-        // If it's a relative path, construct the full URL
-        return URL(string: "https://imba-server.up.railway.app" + avatarUrl)
-    }
-    
-    init(id: String, name: String, avatarUrl: String? = nil, isCurrentUser: Bool = false) {
-        self.id = id
-        self.name = name
-        self.avatarUrl = avatarUrl
-        self.isCurrentUser = isCurrentUser
-    }
-    
-    // Convenience initializer from UserProfileData
-    init(from profileData: UserProfileData, isCurrentUser: Bool = true) {
-        self.id = profileData.id
-        self.name = profileData.name
-        self.avatarUrl = profileData.profilePicture
-        self.isCurrentUser = isCurrentUser
+        // Otherwise, prepend the base URL
+        let baseURL = "https://imba-server.up.railway.app"
+        let fullUrl = baseURL + avatarUrl
+        print("🔗 Constructed full avatar URL: \(fullUrl)")
+        return URL(string: fullUrl)
     }
 }
 
@@ -141,6 +167,24 @@ struct ProgressData: Codable {
     }
 }
 
+//struct ModuleResponse: Codable {
+//    let id: String
+//    let slug: String
+//    var title: String
+//    var description: String?
+//    var isPrivate: Bool
+//    let userId: String
+//    let progress: ProgressData?
+//    
+//    // Optional fields
+//    let createdAt: String?
+//    let updatedAt: String?
+//    
+//    // Computed property
+//    var termsCount: Int? {
+//        return progress?.total
+//    }
+//}
 struct ModuleResponse: Codable {
     let id: String
     let slug: String
@@ -154,12 +198,21 @@ struct ModuleResponse: Codable {
     let createdAt: String?
     let updatedAt: String?
     
+    // ADD THESE FIELDS FOR CREATOR INFO
+    let creatorName: String?
+    let creatorAvatar: String?
+    
     // Computed property
     var termsCount: Int? {
         return progress?.total
     }
+    
+    enum CodingKeys: String, CodingKey {
+        case id, slug, title, description, isPrivate, userId, progress, createdAt, updatedAt
+        case creatorName = "creatorName"  // Make sure this matches your API response
+        case creatorAvatar = "creatorAvatar"  // Make sure this matches your API response
+    }
 }
-
 
 
 struct CreateModuleResponse: Codable {

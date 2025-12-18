@@ -299,37 +299,7 @@ class ModuleDetailViewController: BaseViewController {
     }
     
     private func setupViewModelCallbacks() {
-        viewModel.onDataUpdated = { [weak self] in
-            self?.updateUI()
-        }
-        
-        viewModel.onError = { [weak self] message in
-            self?.showError(message: message)
-        }
-        
-        viewModel.onModuleDeleted = { [weak self] in
-            self?.showModuleDeletedSuccess()
-        }
-        
-        viewModel.onNavigateToEditModule = { [weak self] module, terms in
-            self?.navigateToEditModule(module, terms: terms)
-        }
-        
-        viewModel.onNavigateToCardsMode = { [weak self] module, terms in
-            self?.navigateToCardsMode(module, terms: terms)
-        }
-        
-        viewModel.onNavigateBack = { [weak self] in
-            self?.navigateBack()
-        }
-        
-        viewModel.onUpdateCardsButtonState = { [weak self] isEnabled in
-            self?.updateCardsModeButton(isEnabled)
-        }
-        
-        viewModel.onUpdateEmptyState = { [weak self] shouldShow, message in
-            self?.updateEmptyState(shouldShow: shouldShow, message: message)
-        }
+        viewModel.delegate = self
     }
     
     // MARK: - UI Updates
@@ -406,11 +376,28 @@ class ModuleDetailViewController: BaseViewController {
         filterSegmentedControl.selectedSegmentIndex = viewModel.shouldShowOnlyFavorites ? 1 : 0
     }
     
-    // MARK: - Navigation Methods
+//    // MARK: - Navigation Methods
+//    private func navigateToCardsMode(_ module: ModuleResponse, terms: [TermResponse]) {
+//        let cardsVC = CardsModeViewController()
+//        cardsVC.module = module
+//        cardsVC.terms = terms
+//        
+//        // Add callback to refresh terms when returning
+//        cardsVC.onFavoriteUpdate = { [weak self] in
+//            self?.loadModuleDetails()
+//        }
+//        
+//        if let navController = navigationController {
+//            navController.pushViewController(cardsVC, animated: true)
+//        } else {
+//            cardsVC.modalPresentationStyle = .fullScreen
+//            present(cardsVC, animated: true)
+//        }
+//    }
+    
     private func navigateToCardsMode(_ module: ModuleResponse, terms: [TermResponse]) {
-        let cardsVC = CardsModeViewController()
-        cardsVC.module = module
-        cardsVC.terms = terms
+        let viewModel = CardsModeViewModel(module: module, terms: terms)
+        let cardsVC = CardsModeViewController(viewModel: viewModel)
         
         // Add callback to refresh terms when returning
         cardsVC.onFavoriteUpdate = { [weak self] in
@@ -528,26 +515,31 @@ class ModuleDetailViewController: BaseViewController {
     }
     
     // MARK: - Avatar Methods (Keep these in VC since they're UI-specific)
+    // MARK: - Avatar Methods (Keep these in VC since they're UI-specific)
     private func loadProfileImage(from url: URL, for creatorInfo: UserInfo) {
-        let cacheKey = "creator_\(creatorInfo.id)_avatar"
+        print("🔄 Loading profile image for creator: \(creatorInfo.name)")
+        print("🔗 URL: \(url.absoluteString)")
         
-        // Check cache first
+        // Show placeholder first
+        setPlaceholderAvatar(for: creatorInfo)
+        
+        // Check cache first - IMPORTANT: Use same cache key as AccountViewController
+        let cacheKey = "profileImage_\(creatorInfo.id)"
         if let cachedImageData = UserDefaults.standard.data(forKey: cacheKey),
            let cachedImage = UIImage(data: cachedImageData) {
             creatorAvatarImageView.image = cachedImage
             creatorAvatarImageView.tintColor = nil
+            print("✅ Loaded creator avatar from cache: \(creatorInfo.name)")
             return
         }
         
-        // Show placeholder while loading
-        setPlaceholderAvatar(for: creatorInfo)
-        
         // Download image
+        print("🌐 Downloading avatar from server...")
         URLSession.shared.dataTask(with: url) { [weak self] data, response, error in
             guard let self = self else { return }
             
             if let error = error {
-                print("❌ Error loading creator avatar: \(error)")
+                print("❌ Error loading creator avatar: \(error.localizedDescription)")
                 DispatchQueue.main.async {
                     self.setPlaceholderAvatar(for: creatorInfo)
                 }
@@ -563,26 +555,40 @@ class ModuleDetailViewController: BaseViewController {
             }
             
             DispatchQueue.main.async {
-                print("✅ Loaded creator avatar for: \(creatorInfo.name)")
+                print("✅ Successfully loaded creator avatar for: \(creatorInfo.name)")
                 
                 // Set the actual image
                 self.creatorAvatarImageView.image = image
                 self.creatorAvatarImageView.tintColor = nil
                 
-                // Cache the image
+                // Cache the image - USE SAME KEY AS ACCOUNT VIEW
                 if let imageData = image.jpegData(compressionQuality: 0.8) {
                     UserDefaults.standard.set(imageData, forKey: cacheKey)
                     UserDefaults.standard.synchronize()
+                    print("✅ Creator avatar cached with key: \(cacheKey)")
                 }
             }
         }.resume()
     }
     
     private func setPlaceholderAvatar(for creatorInfo: UserInfo) {
+        print("🖼️ Setting placeholder for: \(creatorInfo.name)")
+        
         if creatorInfo.isCurrentUser {
             creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
             creatorAvatarImageView.tintColor = .pinkButton
         } else {
+            // Try to get from cache first with correct key
+            let cacheKey = "profileImage_\(creatorInfo.id)"
+            if let cachedImageData = UserDefaults.standard.data(forKey: cacheKey),
+               let cachedImage = UIImage(data: cachedImageData) {
+                creatorAvatarImageView.image = cachedImage
+                creatorAvatarImageView.tintColor = nil
+                print("✅ Found cached avatar for placeholder")
+                return
+            }
+            
+            // If no cached image, create initial-based placeholder
             if let firstLetter = creatorInfo.name.first {
                 let label = UILabel()
                 label.text = String(firstLetter).uppercased()
@@ -601,6 +607,7 @@ class ModuleDetailViewController: BaseViewController {
                 
                 creatorAvatarImageView.image = image
                 creatorAvatarImageView.tintColor = nil
+                print("📝 Created initial-based placeholder for: \(creatorInfo.name)")
             } else {
                 creatorAvatarImageView.image = UIImage(systemName: "person.circle.fill")
                 creatorAvatarImageView.tintColor = .gray
@@ -654,4 +661,56 @@ extension ModuleDetailViewController: UITableViewDataSource, UITableViewDelegate
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         // Do nothing - cells are not selectable
     }
+}
+
+
+extension ModuleDetailViewController: ModuleDetailViewModelDelegate {
+    func onDataUpdated() {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateUI()
+        }
+    }
+    
+    func onError(_ message: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.showError(message: message)
+        }
+    }
+    
+    func onModuleDeleted() {
+        DispatchQueue.main.async { [weak self] in
+            self?.showModuleDeletedSuccess()
+        }
+    }
+    
+    func onNavigateToEditModule(_ module: ModuleResponse, terms: [TermResponse]) {
+        DispatchQueue.main.async { [weak self] in
+            self?.navigateToEditModule(module, terms: terms)
+        }
+    }
+    
+    func onNavigateToCardsMode(_ module: ModuleResponse, terms: [TermResponse]) {
+        DispatchQueue.main.async { [weak self] in
+            self?.navigateToCardsMode(module, terms: terms)
+        }
+    }
+    
+    func onNavigateBack() {
+        DispatchQueue.main.async { [weak self] in
+            self?.navigateBack()
+        }
+    }
+    
+    func onUpdateCardsButtonState(_ isEnabled: Bool) {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateCardsModeButton(isEnabled)
+        }
+    }
+    
+    func onUpdateEmptyState(_ isEmpty: Bool, message: String) {
+        DispatchQueue.main.async { [weak self] in
+            self?.updateEmptyState(shouldShow: isEmpty, message: message)
+        }
+    }
+    
 }

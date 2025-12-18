@@ -5,6 +5,12 @@
 
 import Foundation
 
+// MARK: - ChangePasswordViewModelDelegate Protocol
+protocol ChangePasswordViewModelDelegate: AnyObject {
+    func onViewStateChanged(_ viewState: ChangePasswordViewModel.ViewState) -> Void
+    func onNavigateToLogin() -> Void  // Only keep this one for logout navigation
+}
+
 class ChangePasswordViewModel {
     
     // MARK: - Properties
@@ -12,6 +18,8 @@ class ChangePasswordViewModel {
     private(set) var isCurrentPasswordVisible = false
     private(set) var isNewPasswordVisible = false
     private(set) var isConfirmPasswordVisible = false
+    
+    weak var delegate: ChangePasswordViewModelDelegate?
     
     // MARK: - View State
     enum ViewState {
@@ -29,11 +37,6 @@ class ChangePasswordViewModel {
         case confirmPassword
     }
     
-    // MARK: - Callbacks
-    var onViewStateChanged: ((ViewState) -> Void)?
-    var onNavigateBack: (() -> Void)?
-    var onNavigateToLogin: (() -> Void)?
-    
     // MARK: - Public Methods
     
     func changePassword(currentPassword: String?, newPassword: String?, confirmPassword: String?) {
@@ -48,13 +51,13 @@ class ChangePasswordViewModel {
         
         guard case .valid(let validatedCurrentPassword, let validatedNewPassword, _) = validationResult else {
             if case .invalid(let title, let message, let field) = validationResult {
-                onViewStateChanged?(.validationError(title: title, message: message, fieldToFocus: field))
+                delegate?.onViewStateChanged(.validationError(title: title, message: message, fieldToFocus: field))
             }
             return
         }
         
         isLoading = true
-        onViewStateChanged?(.loading)
+        delegate?.onViewStateChanged(.loading)
         
         print("🔐 Changing password...")
         print("   Old: \(String(repeating: "*", count: validatedCurrentPassword.count))")
@@ -83,6 +86,18 @@ class ChangePasswordViewModel {
     
     func toggleConfirmPasswordVisibility() {
         isConfirmPasswordVisible.toggle()
+    }
+    
+    // MARK: - Logout (for successful password change)
+    func logoutAndGoToLogin() {
+        // Clear local data
+        NetworkManager.shared.authToken = nil
+        UserDefaults.standard.removeObject(forKey: "authToken")
+        UserDefaults.standard.removeObject(forKey: "currentUser")
+        UserDefaults.standard.synchronize()
+        
+        // Navigate to login
+        delegate?.onNavigateToLogin()
     }
     
     // MARK: - Validation
@@ -161,31 +176,15 @@ class ChangePasswordViewModel {
             print("✅ Change password response: ok=\(response.ok), message=\(response.message)")
             
             if response.ok {
-                onViewStateChanged?(.success(message: response.message))
+                delegate?.onViewStateChanged(.success(message: response.message))
             } else {
                 // API returned success false with error message
-                onViewStateChanged?(.changePasswordError(title: "Change Password Failed", message: response.message))
+                delegate?.onViewStateChanged(.changePasswordError(title: "Change Password Failed", message: response.message))
             }
             
         case .failure(let error):
             print("❌ Change password error: \(error)")
-            onViewStateChanged?(.networkError(error: error))
+            delegate?.onViewStateChanged(.networkError(error: error))
         }
-    }
-    
-    // MARK: - Navigation
-    func navigateBack() {
-        onNavigateBack?()
-    }
-    
-    func logoutAndGoToLogin() {
-        // Clear local data
-        NetworkManager.shared.authToken = nil
-        UserDefaults.standard.removeObject(forKey: "authToken")
-        UserDefaults.standard.removeObject(forKey: "currentUser")
-        UserDefaults.standard.synchronize()
-        
-        // Navigate to login
-        onNavigateToLogin?()
     }
 }

@@ -45,7 +45,7 @@ class HomeViewController: BaseViewController {
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
-
+    
     private lazy var emptyStateImageView: UIImageView = {
         let imageView = UIImageView()
         imageView.contentMode = .scaleAspectFit
@@ -101,49 +101,37 @@ class HomeViewController: BaseViewController {
     }
     
     private func setupConstraints() {
-            NSLayoutConstraint.activate([
-                tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
-                tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-                tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-                tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
-                
-                loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-                
-                // Empty State View
-                emptyStateView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-                emptyStateView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-                emptyStateView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
-                emptyStateView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
-                
-                // Empty State Image
-                emptyStateImageView.topAnchor.constraint(equalTo: emptyStateView.topAnchor),
-                emptyStateImageView.centerXAnchor.constraint(equalTo: emptyStateView.centerXAnchor),
-                emptyStateImageView.widthAnchor.constraint(equalToConstant: 200),
-                emptyStateImageView.heightAnchor.constraint(equalToConstant: 200),
-                
-                // Empty State Label
-                emptyStateLabel.topAnchor.constraint(equalTo: emptyStateImageView.bottomAnchor, constant: 0),
-                emptyStateLabel.leadingAnchor.constraint(equalTo: emptyStateView.leadingAnchor),
-                emptyStateLabel.trailingAnchor.constraint(equalTo: emptyStateView.trailingAnchor),
-                emptyStateLabel.bottomAnchor.constraint(equalTo: emptyStateView.bottomAnchor)
-            ])
+        NSLayoutConstraint.activate([
+            tableView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            tableView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            tableView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            tableView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            
+            loadingIndicator.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            loadingIndicator.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            
+            // Empty State View
+            emptyStateView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            emptyStateView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
+            emptyStateView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
+            emptyStateView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
+            
+            // Empty State Image
+            emptyStateImageView.topAnchor.constraint(equalTo: emptyStateView.topAnchor),
+            emptyStateImageView.centerXAnchor.constraint(equalTo: emptyStateView.centerXAnchor),
+            emptyStateImageView.widthAnchor.constraint(equalToConstant: 200),
+            emptyStateImageView.heightAnchor.constraint(equalToConstant: 200),
+            
+            // Empty State Label
+            emptyStateLabel.topAnchor.constraint(equalTo: emptyStateImageView.bottomAnchor, constant: 0),
+            emptyStateLabel.leadingAnchor.constraint(equalTo: emptyStateView.leadingAnchor),
+            emptyStateLabel.trailingAnchor.constraint(equalTo: emptyStateView.trailingAnchor),
+            emptyStateLabel.bottomAnchor.constraint(equalTo: emptyStateView.bottomAnchor)
+        ])
     }
     
     private func setupViewModelCallbacks() {
-        viewModel.onDataUpdated = { [weak self] in
-            self?.tableView.reloadData()
-            self?.updateEmptyState()
-            self?.stopAllLoaders() // Stop refresh control when data is updated
-        }
-        
-        viewModel.onError = { [weak self] message in
-            self?.showError(message: message)
-        }
-        
-        viewModel.onNavigateToModuleDetail = { [weak self] module in
-            self?.navigateToModuleDetail(with: module)
-        }
+        viewModel.delegate = self
     }
     
     // MARK: - Helper Methods
@@ -321,5 +309,22 @@ extension HomeViewController: UITableViewDataSource, UITableViewDelegate {
     func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
         tableView.deselectRow(at: indexPath, animated: true)
         viewModel.handleCellSelection(at: indexPath)
+    }
+}
+
+// MARK: - HomePageViewModelDelegate
+extension HomeViewController: HomePageViewModelDelegate {
+    func onDataUpdated() {
+        tableView.reloadData()
+        updateEmptyState()
+        stopAllLoaders() // Stop refresh control when data is updated
+    }
+    
+    func onError(_ message: String) {
+        showError(message: message)
+    }
+    
+    func onNavigateToModuleDetail(_ moduleResponse: ModuleResponse) {
+        navigateToModuleDetail(with: moduleResponse)
     }
 }

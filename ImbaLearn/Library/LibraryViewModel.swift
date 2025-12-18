@@ -5,6 +5,13 @@
 
 import Foundation
 
+protocol LibraryViewModelDelegate: AnyObject{
+    func onDataUpdated() -> Void
+    func onError(_ message: String) -> Void
+    func onNavigateToModuleDetail(_ moduleResponse: ModuleResponse) -> Void
+    func onUpdateEmptyState(_ isEmpty: Bool, message: String) -> Void
+}
+
 class LibraryViewModel {
     
     // MARK: - Properties
@@ -13,20 +20,7 @@ class LibraryViewModel {
     private(set) var isLoading = false
     private var termsCountCache: [String: Int] = [:]
     
-    // MARK: - Callbacks
-    var onDataUpdated: (() -> Void)? //associated value - viewState enum
-    var onError: ((String) -> Void)?
-    var onNavigateToModuleDetail: ((ModuleResponse) -> Void)?
-    var onUpdateEmptyState: ((Bool, String) -> Void)?
-    
-//    enum ViewState {
-//        case loading
-//        case loaded
-//        case empty
-//        case error(String)
-//        case saving
-//        case saved
-//    }
+    weak var delegate: LibraryViewModelDelegate?
     
     // MARK: - Public Methods
     
@@ -67,7 +61,7 @@ class LibraryViewModel {
             }
         }
         
-        onDataUpdated?()
+        delegate?.onDataUpdated()
         updateEmptyState()
     }
     
@@ -81,7 +75,7 @@ class LibraryViewModel {
             filteredModules.sort { $0.title.lowercased() > $1.title.lowercased() }
         }
         
-        onDataUpdated?()
+        delegate?.onDataUpdated()
     }
     
     func getModule(at indexPath: IndexPath) -> ModuleResponse? {
@@ -144,16 +138,16 @@ class LibraryViewModel {
                         // Load terms count for all modules
                         self.loadTermsCountForAllModules()
                         
-                        self.onDataUpdated?()
+                        self.delegate?.onDataUpdated()
                         self.updateEmptyState()
                         
                     } else {
-                        self.onError?(response.message)
+                        self.delegate?.onError(response.message)
                         self.updateEmptyState()
                     }
                     
                 case .failure(let error):
-                    self.onError?(error.localizedDescription)
+                    self.delegate?.onError(error.localizedDescription)
                     self.updateEmptyState()
                 }
             }
@@ -180,7 +174,7 @@ class LibraryViewModel {
     
     private func handleModulesLoadingError(_ message: String) {
         isLoading = false
-        onError?(message)
+        delegate?.onError(message)
         updateEmptyState()
     }
     
@@ -193,7 +187,7 @@ class LibraryViewModel {
                 
                 DispatchQueue.main.async {
                     self.termsCountCache[module.id] = count ?? 0
-                    self.onDataUpdated?()
+                    self.delegate?.onDataUpdated()
                 }
             }
         }
@@ -217,7 +211,7 @@ class LibraryViewModel {
     
     private func updateEmptyState() {
         let (shouldShow, message) = shouldShowEmptyState()
-        onUpdateEmptyState?(shouldShow, message)
+        delegate?.onUpdateEmptyState(shouldShow, message: message)
     }
 }
 

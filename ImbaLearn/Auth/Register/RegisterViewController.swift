@@ -110,7 +110,7 @@ class RegisterViewController: BaseViewController {
         let textField = UITextField()
         textField.placeholder = "Enter your password"
         textField.borderStyle = .none
-        textField.isSecureTextEntry = true
+       // textField.isSecureTextEntry = true
         textField.layer.cornerRadius = 12
         textField.applyShadow()
         textField.backgroundColor = .white
@@ -120,6 +120,12 @@ class RegisterViewController: BaseViewController {
         textField.leftView = paddingView
         textField.leftViewMode = .always
         
+//        if #available(iOS 12.0, *) {
+//                textField.textContentType = .oneTimeCode // Or .password, but .oneTimeCode works better
+//            } else {
+//                textField.textContentType = .init(UITextContentType(rawValue: "")) // Empty string for older iOS
+//            }
+//
         return textField
     }()
     
@@ -136,7 +142,7 @@ class RegisterViewController: BaseViewController {
         let textField = UITextField()
         textField.placeholder = "Confirm your password"
         textField.borderStyle = .none
-        textField.isSecureTextEntry = true
+       // textField.isSecureTextEntry = true
         textField.layer.cornerRadius = 12
         textField.applyShadow()
         textField.backgroundColor = .white
@@ -228,19 +234,7 @@ class RegisterViewController: BaseViewController {
     }
     
     private func setupViewModelCallbacks() {
-        viewModel.onViewStateChanged = { [weak self] state in
-            DispatchQueue.main.async {
-                self?.handleViewState(state)
-            }
-        }
-        
-        viewModel.onNavigateToMainApp = { [weak self] in
-            self?.navigateToMainApp()
-        }
-        
-        viewModel.onNavigateToLogin = { [weak self] in
-            self?.navigateToLogin()
-        }
+        viewModel.delegate = self
     }
     
     private func setupConstraints() {
@@ -506,5 +500,30 @@ extension RegisterViewController {
             textField.resignFirstResponder()
         }
         return true
+    }
+    
+//    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+//        return false
+//    }
+}
+
+extension RegisterViewController: RegisterViewModelDelegate {
+    
+    func onViewStateChanged(_ viewState: RegisterViewModel.ViewState) {
+        DispatchQueue.main.async { [weak self] in
+            self?.handleViewState(viewState)
+        }
+    }
+    
+    func onNavigateToMainApp() {
+        DispatchQueue.main.async { [weak self] in
+            self?.navigateToMainApp()
+        }
+    }
+    
+    func onNavigateToLogin() {
+        DispatchQueue.main.async { [weak self] in
+            self?.navigateToLogin()
+        }
     }
 }

@@ -69,15 +69,6 @@ class AccountViewController: BaseViewController {
         return button
     }()
     
-//    private lazy var userInfoStack: UIStackView = {
-//        let stack = UIStackView()
-//        stack.axis = .vertical
-//        stack.spacing = 4
-//        stack.alignment = .leading
-//        stack.translatesAutoresizingMaskIntoConstraints = false
-//        return stack
-//    }()
-//    
     private lazy var nameLabel: UILabel = {
         let label = UILabel()
         label.text = "Loading..."
@@ -87,7 +78,7 @@ class AccountViewController: BaseViewController {
         label.translatesAutoresizingMaskIntoConstraints = false
         return label
     }()
-
+    
     private lazy var emailLabel: UILabel = {
         let label = UILabel()
         label.text = "loading..."
@@ -217,48 +208,48 @@ class AccountViewController: BaseViewController {
     }()
     
     // MARK: - Lifecycle
-        override func viewDidLoad() {
-            super.viewDidLoad()
-            setupUI()
-          //  setupTextFields()
-            setupViewModelCallbacks()
-            setupAvatarGesture()
-            viewModel.loadUserData()
-        }
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        setupUI()
+        //  setupTextFields()
+        setupViewModelCallbacks()
+        setupAvatarGesture()
+        viewModel.loadUserData()
+    }
     
     override func viewWillAppear(_ animated: Bool) {
-            super.viewWillAppear(animated)
-            // Refresh user data when view appears
-            viewModel.loadUserData()
-        }
+        super.viewWillAppear(animated)
+        // Refresh user data when view appears
+        viewModel.loadUserData()
+    }
+    
+    private func setupUI() {
+        view.backgroundColor = .background
+        title = "Account"
         
-        private func setupUI() {
-            view.backgroundColor = .background
-            title = "Account"
-            
-            // Add scroll view and content view
-            view.addSubview(scrollView)
-            scrollView.addSubview(contentView)
-            
-            // Add avatar and user info
-            avatarContainer.addSubview(avatarCircle)
-            avatarCircle.addSubview(avatarImageView)
-            avatarCircle.addSubview(avatarLabel)
-            avatarContainer.addSubview(editAvatarButton)
-            
-            contentView.addSubviews(nameLabel, emailLabel)
-
-            
-            // Add all elements to content view
-            contentView.addSubviews(avatarContainer, nameFieldLabel, nameTextField, emailFieldLabel, emailTextField, passwordLabel, passwordTextField, changePasswordButton, logoutButton, deleteAccountButton)
-            setupConstraints()
-        }
+        // Add scroll view and content view
+        view.addSubview(scrollView)
+        scrollView.addSubview(contentView)
         
-        private func setupAvatarGesture() {
-            let tapGesture = UITapGestureRecognizer(target: self, action: #selector(editAvatarTapped))
-            avatarImageView.addGestureRecognizer(tapGesture)
-        }
+        // Add avatar and user info
+        avatarContainer.addSubview(avatarCircle)
+        avatarCircle.addSubview(avatarImageView)
+        avatarCircle.addSubview(avatarLabel)
+        avatarContainer.addSubview(editAvatarButton)
         
+        contentView.addSubviews(nameLabel, emailLabel)
+        
+        
+        // Add all elements to content view
+        contentView.addSubviews(avatarContainer, nameFieldLabel, nameTextField, emailFieldLabel, emailTextField, passwordLabel, passwordTextField, changePasswordButton, logoutButton, deleteAccountButton)
+        setupConstraints()
+    }
+    
+    private func setupAvatarGesture() {
+        let tapGesture = UITapGestureRecognizer(target: self, action: #selector(editAvatarTapped))
+        avatarImageView.addGestureRecognizer(tapGesture)
+    }
+    
     private func setupConstraints() {
         let padding: CGFloat = 20
         let fieldHeight: CGFloat = 50
@@ -308,26 +299,19 @@ class AccountViewController: BaseViewController {
             editAvatarButton.heightAnchor.constraint(equalToConstant: 28),
             
             nameLabel.topAnchor.constraint(equalTo: avatarContainer.bottomAnchor, constant: 16),
-                    nameLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-                    nameLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: padding),
-                    nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding),
-                    
-                    // Email Label - centered below name
-                    emailLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
-                    emailLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-                    emailLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: padding),
-                    emailLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding),
-    
+            nameLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            nameLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: padding),
+            nameLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding),
             
-            // User Info Stack - FIXED: Align to center like avatar
-//            userInfoStack.topAnchor.constraint(equalTo: avatarContainer.bottomAnchor, constant: 16),
-//            userInfoStack.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
-//            userInfoStack.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: padding),
-//            userInfoStack.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding),
-//            
+            // Email Label - centered below name
+            emailLabel.topAnchor.constraint(equalTo: nameLabel.bottomAnchor, constant: 4),
+            emailLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            emailLabel.leadingAnchor.constraint(greaterThanOrEqualTo: contentView.leadingAnchor, constant: padding),
+            emailLabel.trailingAnchor.constraint(lessThanOrEqualTo: contentView.trailingAnchor, constant: -padding),
+            
             // Name Field Label
             nameFieldLabel.topAnchor.constraint(equalTo: emailLabel.bottomAnchor, constant: 40),
-
+            
             nameFieldLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: padding),
             nameFieldLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -padding),
             nameFieldLabel.heightAnchor.constraint(equalToConstant: labelHeight),
@@ -387,52 +371,52 @@ class AccountViewController: BaseViewController {
     
     // MARK: - UI Updates
     private func updateUI(with user: User?) {
-            if let user = user {
-                // Update labels
-                nameLabel.text = user.name
-                emailLabel.text = user.email
-                
-                // Update text fields
-                nameTextField.text = user.name
-                emailTextField.text = user.email
-                
-                // Update avatar
+        if let user = user {
+            // Update labels
+            nameLabel.text = user.name
+            emailLabel.text = user.email
+            
+            // Update text fields
+            nameTextField.text = user.name
+            emailTextField.text = user.email
+            
+            // Update avatar
+            updateAvatar(for: user.name)
+        } else {
+            // Show placeholder data
+            avatarLabel.text = "?"
+            nameLabel.text = "Not logged in"
+            emailLabel.text = "Please login"
+            nameTextField.text = ""
+            emailTextField.text = ""
+            avatarImageView.image = nil
+            avatarLabel.isHidden = false
+            avatarCircle.backgroundColor = .lightGray
+        }
+    }
+    
+    private func updateAvatar(for name: String) {
+        // Show label if no image, hide if image exists
+        avatarLabel.text = viewModel.getAvatarFirstLetter(for: name)
+        avatarLabel.isHidden = (viewModel.profileImage != nil)
+        avatarCircle.backgroundColor = viewModel.getAvatarColor(for: name)
+    }
+    
+    private func updateProfileImage(_ image: UIImage?) {
+        if let image = image {
+            avatarImageView.image = image
+            avatarLabel.isHidden = true
+            avatarCircle.backgroundColor = .clear
+        } else {
+            avatarImageView.image = nil
+            avatarLabel.isHidden = false
+            if let user = viewModel.currentUser {
                 updateAvatar(for: user.name)
-            } else {
-                // Show placeholder data
-                avatarLabel.text = "?"
-                nameLabel.text = "Not logged in"
-                emailLabel.text = "Please login"
-                nameTextField.text = ""
-                emailTextField.text = ""
-                avatarImageView.image = nil
-                avatarLabel.isHidden = false
-                avatarCircle.backgroundColor = .lightGray
             }
         }
-        
-        private func updateAvatar(for name: String) {
-            // Show label if no image, hide if image exists
-            avatarLabel.text = viewModel.getAvatarFirstLetter(for: name)
-            avatarLabel.isHidden = (viewModel.profileImage != nil)
-            avatarCircle.backgroundColor = viewModel.getAvatarColor(for: name)
-        }
-        
-        private func updateProfileImage(_ image: UIImage?) {
-            if let image = image {
-                avatarImageView.image = image
-                avatarLabel.isHidden = true
-                avatarCircle.backgroundColor = .clear
-            } else {
-                avatarImageView.image = nil
-                avatarLabel.isHidden = false
-                if let user = viewModel.currentUser {
-                    updateAvatar(for: user.name)
-                }
-            }
-        }
-        
-        // MARK: - Actions
+    }
+    
+    // MARK: - Actions
     @objc private func editAvatarTapped() {
         let pickerVC = ProfileImagePickerViewController()
         pickerVC.delegate = self
@@ -445,19 +429,15 @@ class AccountViewController: BaseViewController {
     @objc private func changePasswordTapped() {
         print("Change password tapped - attempting to navigate...")
         
-        // Check if we have a navigation controller
-        if let navController = navigationController {
-            print("✅ Navigation controller found, pushing ChangePasswordViewController")
-            let changePasswordVC = ChangePasswordViewController()
-            navController.pushViewController(changePasswordVC, animated: true)
-        } else {
-            print("❌ No navigation controller found!")
-            
-            // Try to present modally as fallback
-            let changePasswordVC = ChangePasswordViewController()
-            let navController = UINavigationController(rootViewController: changePasswordVC)
-            navController.modalPresentationStyle = .fullScreen
-            present(navController, animated: true)
+        let changePasswordVC = ChangePasswordViewController()
+        
+        // Always try to present modally for consistency
+        let navController = UINavigationController(rootViewController: changePasswordVC)
+        navController.modalPresentationStyle = .fullScreen
+        navController.modalTransitionStyle = .coverVertical
+        
+        present(navController, animated: true) {
+            print("✅ ChangePasswordViewController presented successfully")
         }
     }
     
@@ -475,8 +455,8 @@ class AccountViewController: BaseViewController {
     
     @objc private func deleteAccountTapped() {
         let alert = UIAlertController(title: "Delete Account",
-                                    message: "This action cannot be undone. All your data will be permanently deleted.",
-                                    preferredStyle: .alert)
+                                      message: "This action cannot be undone. All your data will be permanently deleted.",
+                                      preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
         alert.addAction(UIAlertAction(title: "Delete", style: .destructive) { [weak self] _ in
             self?.viewModel.performAccountDeletion()

@@ -162,6 +162,9 @@ final class AccountViewModel {
         UserDefaults.standard.synchronize()
     }
     
+    
+    
+        
     private func loadProfileImageFromBackend() {
         guard let user = currentUser,
               let profilePicturePath = user.profilePicture else {

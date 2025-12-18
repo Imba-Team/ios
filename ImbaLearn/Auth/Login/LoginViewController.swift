@@ -176,19 +176,7 @@ class LoginViewController: BaseViewController {
     }
     
     private func setupViewModelCallbacks() {
-        viewModel.onViewStateChanged = { [weak self] state in
-            DispatchQueue.main.async {
-                self?.handleViewState(state)
-            }
-        }
-        
-        viewModel.onNavigateToMainApp = { [weak self] in
-            self?.navigateToMainApp()
-        }
-        
-        viewModel.onNavigateToRegister = { [weak self] in
-            self?.navigateToRegister()
-        }
+        viewModel.delegate = self
     }
     
     private func setupConstraints() {
@@ -421,3 +409,26 @@ extension LoginViewController {
         return true
     }
 }
+
+extension LoginViewController: LoginViewModelDelegate {
+    func onViewStateChanged(_ viewState: LoginViewModel.ViewState) {
+          DispatchQueue.main.async { [weak self] in
+              self?.handleViewState(viewState)
+          }
+      }
+      
+      func onNavigateToMainApp() {
+          DispatchQueue.main.async { [weak self] in
+              self?.navigateToMainApp()
+          }
+      }
+      
+      func onNavigateToRegister() {
+          DispatchQueue.main.async { [weak self] in
+              self?.navigateToRegister()
+          }
+      }
+    
+    
+}
+

@@ -1,105 +1,109 @@
 import Foundation
 
+protocol HomePageViewModelDelegate: AnyObject {
+    func onDataUpdated() -> Void
+    func onError(_ message: String) -> Void
+    func onNavigateToModuleDetail(_ moduleResponse: ModuleResponse) -> Void
+    
+}
+
 class HomeViewModel {
     
     // MARK: - Properties
-        private(set) var continueLearningSets: [ModuleResponse] = []
-        private(set) var allModules: [ModuleResponse] = []
-        private(set) var isLoading = false
-        private var termsCountCache: [String: Int] = [:]
+    private(set) var continueLearningSets: [ModuleResponse] = []
+    private(set) var allModules: [ModuleResponse] = []
+    private(set) var isLoading = false
+    private var termsCountCache: [String: Int] = [:]
+    
+    weak var delegate: HomePageViewModelDelegate?
+    
+    // MARK: - Data Methods
+    func loadModules() {
+        guard !isLoading else { return }
         
-        // MARK: - Callbacks
-        var onDataUpdated: (() -> Void)?
-        var onError: ((String) -> Void)?
-        var onNavigateToModuleDetail: ((ModuleResponse) -> Void)?
+        isLoading = true
         
-        // MARK: - Data Methods
-        func loadModules() {
-            guard !isLoading else { return }
+        NetworkManager.shared.getUserModules { [weak self] result in
+            guard let self = self else { return }
             
-            isLoading = true
-            
-            NetworkManager.shared.getUserModules { [weak self] result in
+            DispatchQueue.main.async {
+                self.isLoading = false
+                
+                switch result {
+                case .success(let response):
+                    if response.ok {
+                        self.processModules(response.data ?? [])
+                    } else {
+                        // Even if API says OK but returns empty data
+                        self.processModules([])
+                        self.delegate?.onError(response.message)
+                    }
+                    
+                case .failure(let error):
+                    // On network error, still update UI to show empty state
+                    self.processModules([])
+                    self.delegate?.onError(error.localizedDescription)
+                }
+            }
+        }
+    }
+    
+    private func processModules(_ modules: [ModuleResponse]) {
+        // Clear previous cache
+        termsCountCache.removeAll()
+        
+        // All modules
+        allModules = modules
+        
+        if modules.isEmpty {
+            continueLearningSets = []
+            // Don't load terms count if no modules
+            self.delegate?.onDataUpdated()
+            return
+        }
+        
+        // For Continue Learning, show modules that are started (has progress > 0)
+        let modulesStarted = modules.filter { ($0.progress?.completed ?? 0) > 0 }
+        
+        if !modulesStarted.isEmpty {
+            continueLearningSets = modulesStarted
+        } else {
+            let randomModules = modules.shuffled().prefix(3)
+            continueLearningSets = Array(randomModules)
+        }
+        
+        // Load terms count for all modules
+        loadTermsCountForAllModules()
+    }
+    
+    private func loadTermsCountForAllModules() {
+        // If no modules, just notify
+        if allModules.isEmpty {
+            self.delegate?.onDataUpdated()
+            return
+        }
+        
+        var modulesToLoad = allModules.count
+        var loadedCount = 0
+        
+        // Load terms count for each module
+        for module in allModules {
+            loadTermsCount(for: module) { [weak self] count in
                 guard let self = self else { return }
                 
                 DispatchQueue.main.async {
-                    self.isLoading = false
+                    // Cache the result
+                    self.termsCountCache[module.id] = count ?? 0
+                    loadedCount += 1
                     
-                    switch result {
-                    case .success(let response):
-                        if response.ok {
-                            self.processModules(response.data ?? [])
-                        } else {
-                            // Even if API says OK but returns empty data
-                            self.processModules([])
-                            self.onError?(response.message)
-                        }
-                        
-                    case .failure(let error):
-                        // On network error, still update UI to show empty state
-                        self.processModules([])
-                        self.onError?(error.localizedDescription)
+                    // Notify when all modules are loaded
+                    if loadedCount == modulesToLoad {
+                        self.delegate?.onDataUpdated()
                     }
                 }
             }
         }
-        
-        private func processModules(_ modules: [ModuleResponse]) {
-            // Clear previous cache
-            termsCountCache.removeAll()
-            
-            // All modules
-            allModules = modules
-            
-            if modules.isEmpty {
-                continueLearningSets = []
-                // Don't load terms count if no modules
-                self.onDataUpdated?()
-                return
-            }
-            
-            // For Continue Learning, show modules that are started (has progress > 0)
-            let modulesStarted = modules.filter { ($0.progress?.completed ?? 0) > 0 }
-            
-            if !modulesStarted.isEmpty {
-                continueLearningSets = modulesStarted
-            } else {
-                let randomModules = modules.shuffled().prefix(3)
-                continueLearningSets = Array(randomModules)
-            }
-            
-            // Load terms count for all modules
-            loadTermsCountForAllModules()
-        }
-        
-        private func loadTermsCountForAllModules() {
-            // If no modules, just notify
-            if allModules.isEmpty {
-                self.onDataUpdated?()
-                return
-            }
-            
-            var modulesToLoad = allModules.count
-            var loadedCount = 0
-            
-            // Load terms count for each module
-            for module in allModules {
-                loadTermsCount(for: module) { [weak self] count in
-                    guard let self = self else { return }
-                    
-                    DispatchQueue.main.async {
-                        // Cache the result
-                        self.termsCountCache[module.id] = count ?? 0
-                        loadedCount += 1
-                        
-                        // Notify when all modules are loaded
-                        if loadedCount == modulesToLoad {
-                            self.onDataUpdated?()
-                        }
-                    }
-                }
-            }
-        }
+    }
     
     private func loadTermsCount(for module: ModuleResponse, completion: @escaping (Int?) -> Void) {
         NetworkManager.shared.getModuleTerms(moduleId: module.id) { result in
@@ -124,7 +128,7 @@ class HomeViewModel {
     
     // MARK: - Navigation Methods
     func navigateToModuleDetail(with module: ModuleResponse) {
-        onNavigateToModuleDetail?(module)
+        delegate?.onNavigateToModuleDetail(module)
     }
     
     func getModuleForSection(_ section: Int) -> ModuleResponse? {

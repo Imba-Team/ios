@@ -5,12 +5,22 @@
 
 import Foundation
 
+protocol LoginViewModelDelegate: AnyObject{
+    func onViewStateChanged(_ viewState: LoginViewModel.ViewState) -> Void
+    func onNavigateToMainApp() -> Void
+    func onNavigateToRegister() -> Void
+}
+
+
 class LoginViewModel {
     
     let authRepository: AuthRepository = AuthRepository(apiService: .shared)
     
     // MARK: - Properties
     private(set) var isLoading = false
+    
+    weak var delegate: LoginViewModelDelegate?
+
     
     // MARK: - View State
     enum ViewState {
@@ -22,10 +32,10 @@ class LoginViewModel {
         case networkError(error: NetworkError)
     }
     
-    // MARK: - Callbacks
-    var onViewStateChanged: ((ViewState) -> Void)?
-    var onNavigateToMainApp: (() -> Void)?
-    var onNavigateToRegister: (() -> Void)?
+//    // MARK: - Callbacks
+//    var onViewStateChanged: ((ViewState) -> Void)?
+//    var onNavigateToMainApp: (() -> Void)?
+//    var onNavigateToRegister: (() -> Void)?
     
     // MARK: - Public Methods
     
@@ -36,13 +46,13 @@ class LoginViewModel {
         let validationResult = validateInputs(email: email, password: password)
         guard case .valid(let validatedEmail, let validatedPassword) = validationResult else {
             if case .invalid(let title, let message) = validationResult {
-                onViewStateChanged?(.validationError(title: title, message: message))
+                delegate?.onViewStateChanged(.validationError(title: title, message: message))
             }
             return
         }
         
         isLoading = true
-        onViewStateChanged?(.loading)
+        delegate?.onViewStateChanged(.loading)
         
         print("🔐 Attempting login for: \(validatedEmail)")
         
@@ -68,7 +78,7 @@ class LoginViewModel {
     }
     
     func navigateToRegister() {
-        onNavigateToRegister?()
+        delegate?.onNavigateToRegister()
     }
     
     // MARK: - Validation
@@ -115,16 +125,16 @@ class LoginViewModel {
                 saveUserData(email: email)
                 
                 // Show success and navigate
-                onViewStateChanged?(.success(message: "Login successful!"))
+                delegate?.onViewStateChanged(.success(message: "Login successful!"))
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                    self?.onNavigateToMainApp?()
+                    self?.delegate?.onNavigateToMainApp()
                 }
             } else {
-                onViewStateChanged?(.loginError(title: "Login Failed", message: response.message))
+                delegate?.onViewStateChanged(.loginError(title: "Login Failed", message: response.message))
             }
             
         case .failure(let error):
-            onViewStateChanged?(.networkError(error: error))
+            delegate?.onViewStateChanged(.networkError(error: error))
         }
     }
     

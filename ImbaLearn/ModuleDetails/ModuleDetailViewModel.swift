@@ -5,6 +5,17 @@
 
 import UIKit
 
+protocol ModuleDetailViewModelDelegate: AnyObject {
+    func onDataUpdated() -> Void
+    func onError(_ message: String) -> Void
+    func onModuleDeleted() -> Void
+    func onNavigateToEditModule(_ module: ModuleResponse, terms: [TermResponse]) -> Void
+    func onNavigateToCardsMode(_ module: ModuleResponse, terms: [TermResponse]) -> Void
+    func onNavigateBack() -> Void
+    func onUpdateCardsButtonState(_ isEnabled: Bool) -> Void
+    func onUpdateEmptyState(_ isEmpty: Bool, message: String) -> Void
+}
+
 class ModuleDetailViewModel {
     
     // MARK: - Properties
@@ -15,16 +26,8 @@ class ModuleDetailViewModel {
     private(set) var isLoading = false
     private(set) var creatorInfo: UserInfo?
     
-    // MARK: - Callbacks
-    var onDataUpdated: (() -> Void)?
-    var onError: ((String) -> Void)?
-    var onModuleDeleted: (() -> Void)?
-    var onNavigateToEditModule: ((ModuleResponse, [TermResponse]) -> Void)?
-    var onNavigateToCardsMode: ((ModuleResponse, [TermResponse]) -> Void)?
-    var onNavigateBack: (() -> Void)?
-    var onUpdateCardsButtonState: ((Bool) -> Void)?
-    var onUpdateEmptyState: ((Bool, String) -> Void)?
-    
+    weak var delegate: ModuleDetailViewModelDelegate?
+      
     // MARK: - Public Methods
     
     func loadModuleDetails() {
@@ -47,11 +50,11 @@ class ModuleDetailViewModel {
                     if response.ok {
                         self.processTerms(response.data?.data ?? [])
                     } else {
-                        self.onError?(response.message)
+                        self.delegate?.onError(response.message)
                     }
                     
                 case .failure(let error):
-                    self.onError?(error.localizedDescription)
+                    self.delegate?.onError(error.localizedDescription)
                 }
             }
         }
@@ -60,7 +63,7 @@ class ModuleDetailViewModel {
     func toggleFavoriteFilter() {
         showOnlyFavorites.toggle()
         updateFilteredTerms()
-        onDataUpdated?()
+        delegate?.onDataUpdated()
         updateCardsModeButtonState()
         updateEmptyState()
     }
@@ -75,7 +78,25 @@ class ModuleDetailViewModel {
         
         // Update locally first for immediate UI feedback
         terms[termIndex].isStarred = newFavoriteStatus
-        updateFilteredTerms()
+        
+        // IMPORTANT: Update filteredTerms based on the new state
+        if showOnlyFavorites && !newFavoriteStatus {
+            // If we're in favorites mode and user unfavorites, remove from filtered
+            if let filteredIndex = filteredTerms.firstIndex(where: { $0.id == termId }) {
+                filteredTerms.remove(at: filteredIndex)
+            }
+        } else if showOnlyFavorites && newFavoriteStatus {
+            // If we're in favorites mode and user favorites, add to filtered
+            filteredTerms.append(terms[termIndex])
+        } else {
+            // In "All" mode, just update the filtered terms
+            if let filteredIndex = filteredTerms.firstIndex(where: { $0.id == termId }) {
+                filteredTerms[filteredIndex].isStarred = newFavoriteStatus
+            }
+        }
+        
+        // Immediately notify delegate to update UI
+        delegate?.onDataUpdated()
         
         // Update cards mode button state
         updateCardsModeButtonState()
@@ -90,21 +111,35 @@ class ModuleDetailViewModel {
                     // Update local data with server response
                     if let index = self?.terms.firstIndex(where: { $0.id == termId }) {
                         self?.terms[index] = updatedTerm
-                        self?.updateFilteredTerms()
+                        
+                        // Update filtered terms too
+                        if let filteredIndex = self?.filteredTerms.firstIndex(where: { $0.id == termId }) {
+                            self?.filteredTerms[filteredIndex] = updatedTerm
+                        }
+                        
+                        // Notify UI of the update
+                        self?.delegate?.onDataUpdated()
                         self?.updateCardsModeButtonState()
                     }
                     
                 case .failure(let error):
                     print("❌ Failed to update favorite: \(error)")
                     
-                    // Revert local change if API call failed
+                    // Revert local change if API call fails
                     if let index = self?.terms.firstIndex(where: { $0.id == termId }) {
                         self?.terms[index].isStarred = term.isStarred // Revert to original
-                        self?.updateFilteredTerms()
+                        
+                        // Also revert in filteredTerms
+                        if let filteredIndex = self?.filteredTerms.firstIndex(where: { $0.id == termId }) {
+                            self?.filteredTerms[filteredIndex].isStarred = term.isStarred
+                        }
+                        
+                        // Notify UI to revert
+                        self?.delegate?.onDataUpdated()
                         self?.updateCardsModeButtonState()
                         
                         // Show error to user
-                        self?.onError?("Failed to update favorite: \(error.localizedDescription)")
+                        self?.delegate?.onError("Failed to update favorite: \(error.localizedDescription)")
                     }
                 }
             }
@@ -123,13 +158,13 @@ class ModuleDetailViewModel {
                 switch result {
                 case .success(let response):
                     if response.ok {
-                        self.onModuleDeleted?()
+                        self.delegate?.onModuleDeleted()
                     } else {
-                        self.onError?(response.message)
+                        self.delegate?.onError(response.message)
                     }
                     
                 case .failure(let error):
-                    self.onError?(error.localizedDescription)
+                    self.delegate?.onError(error.localizedDescription)
                 }
             }
         }
@@ -143,20 +178,20 @@ class ModuleDetailViewModel {
                 "You don't have any favorite terms in this module. Add some favorites first to use Cards Mode with favorites." :
                 "This module doesn't have any terms yet. Add some terms first to use Cards Mode."
             
-            onError?(message)
+            delegate?.onError(message)
             return
         }
         
-        onNavigateToCardsMode?(module, termsToShow)
+        delegate?.onNavigateToCardsMode(module, terms: termsToShow)
     }
     
     func editModule() {
-        onNavigateToEditModule?(module, terms)
+        delegate?.onNavigateToEditModule(module, terms: terms)
     }
     
     func updateModule(_ updatedModule: ModuleResponse) {
         module = updatedModule
-        onDataUpdated?()
+        delegate?.onDataUpdated()
     }
     
     func updateTerms(_ updatedTerms: [TermResponse]) {
@@ -164,7 +199,7 @@ class ModuleDetailViewModel {
         updateFilteredTerms()
         updateCardsModeButtonState()
         updateEmptyState()
-        onDataUpdated?()
+        delegate?.onDataUpdated()
     }
     
     // MARK: - UI Helpers
@@ -183,7 +218,30 @@ class ModuleDetailViewModel {
     }
     
     func getCreatorAvatarUrl() -> URL? {
-        return creatorInfo?.fullAvatarUrl
+        guard let creatorInfo = creatorInfo else {
+            print("⚠️ No creator info available")
+            return nil
+        }
+        
+        print("🔄 Getting avatar URL for creator: \(creatorInfo.name)")
+        print("📸 Avatar path: \(creatorInfo.avatarUrl ?? "nil")")
+        
+        // Try the computed property first
+        if let url = creatorInfo.fullAvatarUrl {
+            print("✅ Created URL: \(url.absoluteString)")
+            return url
+        }
+        
+        // Fallback: Try to construct URL manually
+        if let avatarPath = creatorInfo.avatarUrl, !avatarPath.isEmpty {
+            let baseURL = "https://imba-server.up.railway.app"
+            let fullUrlString = baseURL + avatarPath
+            print("🔧 Manually constructing URL: \(fullUrlString)")
+            return URL(string: fullUrlString)
+        }
+        
+        print("❌ Could not create avatar URL for creator")
+        return nil
     }
     
     func getTerm(at indexPath: IndexPath) -> TermResponse? {
@@ -216,7 +274,7 @@ class ModuleDetailViewModel {
         updateFilteredTerms()
         updateCardsModeButtonState()
         updateEmptyState()
-        onDataUpdated?()
+        delegate?.onDataUpdated()
     }
     
     private func updateFilteredTerms() {
@@ -228,62 +286,55 @@ class ModuleDetailViewModel {
     }
     
     private func loadCreatorInfo() {
-        // Check if creator is current user
-        if let currentUserId = UserDefaults.standard.string(forKey: "currentUserId"),
-           module.userId == currentUserId {
-            // Get current user info
-            NetworkManager.shared.getUserProfile { [weak self] result in
-                guard let self = self else { return }
-                
-                DispatchQueue.main.async {
-                    switch result {
-                    case .success(let response):
-                        if response.ok {
-                            self.creatorInfo = UserInfo(from: response.data, isCurrentUser: true)
-                        } else {
-                            // Set default creator info
-                            self.creatorInfo = UserInfo(
-                                id: self.module.userId,
-                                name: "You",
-                                avatarUrl: nil,
-                                isCurrentUser: true
-                            )
-                        }
-                        self.onDataUpdated?()
-                        
-                    case .failure:
-                        // Set default creator info
-                        self.creatorInfo = UserInfo(
-                            id: self.module.userId,
-                            name: "You",
-                            avatarUrl: nil,
-                            isCurrentUser: true
-                        )
-                        self.onDataUpdated?()
-                    }
-                }
-            }
-        } else {
-            // For other users, show placeholder
+        print("🔄 Loading creator info - Assuming current user")
+        
+        // ALWAYS assume it's the current user
+        // Get from wherever we have user data
+        
+        // Method 1: Check UserDefaults
+        if let savedUserData = UserDefaults.standard.data(forKey: "currentUser"),
+           let savedUser = try? JSONDecoder().decode(User.self, from: savedUserData) {
+            print("✅ Using current user from UserDefaults: \(savedUser.name)")
+            self.creatorInfo = UserInfo(
+                id: savedUser.id,
+                name: savedUser.name,
+                avatarUrl: savedUser.profilePicture,
+                isCurrentUser: true
+            )
+        }
+        // Method 2: If we just fetched modules, the user data might be in the module response
+        else if let currentUserId = UserDefaults.standard.string(forKey: "currentUserId") {
+            print("✅ Using current user ID: \(currentUserId)")
+            self.creatorInfo = UserInfo(
+                id: currentUserId,
+                name: "You",  // Default name
+                avatarUrl: nil,
+                isCurrentUser: true
+            )
+        }
+        // Method 3: Fallback
+        else {
+            print("⚠️ Couldn't find user info, using fallback")
             self.creatorInfo = UserInfo(
                 id: module.userId,
-                name: "Creator",
+                name: "You",
                 avatarUrl: nil,
-                isCurrentUser: false
+                isCurrentUser: true
             )
-            self.onDataUpdated?()
         }
+        
+        self.delegate?.onDataUpdated()
     }
     
     private func updateModuleInfo() {
         // This would update any UI info if needed
-        onDataUpdated?()
+        delegate?.onDataUpdated()
     }
     
     private func updateCardsModeButtonState() {
         let termsToShow = showOnlyFavorites ? terms.filter { $0.isStarred } : terms
         let isEnabled = !termsToShow.isEmpty
-        onUpdateCardsButtonState?(isEnabled)
+        delegate?.onUpdateCardsButtonState(isEnabled)
     }
     
     private func updateEmptyState() {
@@ -291,14 +342,14 @@ class ModuleDetailViewModel {
         
         if isEmpty {
             if terms.isEmpty {
-                onUpdateEmptyState?(true, "No terms yet")
+                delegate?.onUpdateEmptyState(true, message: "No terms yet")
             } else if showOnlyFavorites {
-                onUpdateEmptyState?(true, "No favorite terms")
+                delegate?.onUpdateEmptyState(true, message: "No favorite terms")
             } else {
-                onUpdateEmptyState?(false, "")
+                delegate?.onUpdateEmptyState(false, message: "")
             }
         } else {
-            onUpdateEmptyState?(false, "")
+            delegate?.onUpdateEmptyState(false, message: "")
         }
     }
 }

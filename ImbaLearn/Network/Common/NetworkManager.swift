@@ -366,6 +366,8 @@ class NetworkManager {
         request(endpoint: "/users/me/profile-picture", method: .delete, requiresAuth: true, completion: completion)
     }
     
+    
+    
     // MARK: - Module Methods
     func createModule(request: CreateModuleRequest, completion: @escaping (Result<CreateModuleResponse, NetworkError>) -> Void) {
         do {
@@ -450,6 +452,19 @@ class NetworkManager {
             }
         } catch {
             completion(.failure(.encodingError(error)))
+        }
+    }
+    
+    func getUserById(userId: String, completion: @escaping (Result<UserProfileResponse, NetworkError>) -> Void) {
+        // If we're trying to get current user, use /users/me
+        if let currentUserId = UserDefaults.standard.string(forKey: "currentUserId"),
+           userId == currentUserId {
+            print("✅ Getting current user via /users/me")
+            getUserProfile(completion: completion)
+        } else {
+            // For other users, if your API doesn't support it, we need to handle differently
+            print("⚠️ Cannot fetch other users - API only supports /users/me")
+            completion(.failure(.notFound))
         }
     }
     

@@ -11,6 +11,14 @@ class ChangePasswordViewController: BaseViewController {
     private let viewModel = ChangePasswordViewModel()
     
     // MARK: - UI Elements
+    
+    private lazy var navigationBarView: UIView = {
+        let view = UIView()
+        view.backgroundColor = .pinkButton.withAlphaComponent(0.7)
+        view.translatesAutoresizingMaskIntoConstraints = false
+        return view
+    }()
+    
     private lazy var scrollView: UIScrollView = {
         let scrollView = UIScrollView()
         scrollView.translatesAutoresizingMaskIntoConstraints = false
@@ -214,9 +222,9 @@ class ChangePasswordViewController: BaseViewController {
         view.backgroundColor = .background
         
         // Add header view
-        view.addSubview(headerView)
-        headerView.addSubview(backButton)
-        headerView.addSubview(titleLabel)
+        view.addSubview(navigationBarView)
+        navigationBarView.addSubview(backButton)
+        navigationBarView.addSubview(titleLabel)
         
         // Add scroll view and content view
         view.addSubview(scrollView)
@@ -230,6 +238,7 @@ class ChangePasswordViewController: BaseViewController {
             requirementsLabel,
             changePasswordButton
         )
+        
         
         // Add loading view
         view.addSubview(loadingView)
@@ -252,50 +261,40 @@ class ChangePasswordViewController: BaseViewController {
     }
     
     private func setupViewModelCallbacks() {
-        viewModel.onViewStateChanged = { [weak self] state in
-            DispatchQueue.main.async {
-                self?.handleViewState(state)
-            }
-        }
-        
-        viewModel.onNavigateBack = { [weak self] in
-            self?.navigateBack()
-        }
-        
-        viewModel.onNavigateToLogin = { [weak self] in
-            self?.logoutAndGoToLogin()
-        }
+        viewModel.delegate = self
     }
     
     private func setupConstraints() {
         let padding: CGFloat = 20
         let fieldHeight: CGFloat = 60
         let labelHeight: CGFloat = 20
-        let headerHeight: CGFloat = 150
+        let navBarHeight: CGFloat = 130
         
         NSLayoutConstraint.activate([
             // Header View
-            headerView.topAnchor.constraint(equalTo: view.topAnchor),
-            headerView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
-            headerView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            headerView.heightAnchor.constraint(equalToConstant: headerHeight),
+            navigationBarView.topAnchor.constraint(equalTo: view.topAnchor),
+            navigationBarView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            navigationBarView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            navigationBarView.heightAnchor.constraint(equalToConstant: navBarHeight),
             
-            // Back Button
-            backButton.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: padding),
-            backButton.centerYAnchor.constraint(equalTo: headerView.centerYAnchor, constant: 20),
+            
+            // Back Button - position at bottom of nav bar (where users expect it)
+            backButton.leadingAnchor.constraint(equalTo: navigationBarView.leadingAnchor, constant: padding),
+            backButton.bottomAnchor.constraint(equalTo: navigationBarView.bottomAnchor, constant: -10),
             backButton.widthAnchor.constraint(equalToConstant: 44),
             backButton.heightAnchor.constraint(equalToConstant: 44),
             
-            // Title Label
-            titleLabel.centerYAnchor.constraint(equalTo: headerView.centerYAnchor, constant: 20),
-            titleLabel.leadingAnchor.constraint(equalTo: headerView.leadingAnchor, constant: 25),
-            titleLabel.trailingAnchor.constraint(equalTo: headerView.trailingAnchor, constant: -padding),
+            // Title Label - center in nav bar
+            titleLabel.centerXAnchor.constraint(equalTo: navigationBarView.centerXAnchor),
+            titleLabel.bottomAnchor.constraint(equalTo: navigationBarView.bottomAnchor, constant: -12),
+            titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: backButton.trailingAnchor, constant: 10),
             
-            // Scroll View
-            scrollView.topAnchor.constraint(equalTo: headerView.bottomAnchor),
+            // Scroll View starts below navigation bar
+            scrollView.topAnchor.constraint(equalTo: navigationBarView.bottomAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            
             
             // Content View
             contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
@@ -357,7 +356,7 @@ class ChangePasswordViewController: BaseViewController {
     // MARK: - Actions
     @objc private func backButtonTapped() {
         print("← Back button tapped")
-        viewModel.navigateBack()
+        navigateBack() // Call directly instead of going through ViewModel
     }
     
     @objc private func toggleCurrentPasswordVisibility() {
@@ -382,35 +381,6 @@ class ChangePasswordViewController: BaseViewController {
             newPassword: newPasswordTextField.text,
             confirmPassword: confirmPasswordTextField.text
         )
-    }
-    
-    // MARK: - State Handling
-    private func handleViewState(_ state: ChangePasswordViewModel.ViewState) {
-        switch state {
-        case .idle:
-            // Do nothing
-            break
-            
-        case .loading:
-            showLoading()
-            
-        case .success(let message):
-            hideLoading()
-            showSuccessAlert(message: message)
-            
-        case .validationError(let title, let message, let field):
-            hideLoading()
-            showAlert(title: title, message: message)
-            focusOnField(field)
-            
-        case .changePasswordError(let title, let message):
-            hideLoading()
-            showAlert(title: title, message: message)
-            
-        case .networkError(let error):
-            hideLoading()
-            handleNetworkError(error)
-        }
     }
     
     private func focusOnField(_ field: ChangePasswordViewModel.FocusField) {
@@ -447,16 +417,16 @@ class ChangePasswordViewController: BaseViewController {
     
     // MARK: - Navigation
     private func navigateBack() {
-        // Try different ways to go back
-        if let navigationController = navigationController, navigationController.viewControllers.count > 1 {
-            // If we're in a navigation stack, pop back
-            navigationController.popViewController(animated: true)
-        } else if let presentingViewController = presentingViewController {
-            // If we were presented modally, dismiss
-            dismiss(animated: true, completion: nil)
-        } else {
-            // Fallback: just dismiss if nothing else works
-            dismiss(animated: true, completion: nil)
+        print("navigateBack() called")
+        
+        if presentingViewController != nil {
+            dismiss(animated: true)
+        }
+        else if let nav = navigationController, nav.viewControllers.count > 1 {
+            nav.popViewController(animated: true)
+        }
+        else {
+            dismiss(animated: true)
         }
     }
     
@@ -487,7 +457,7 @@ class ChangePasswordViewController: BaseViewController {
         
         alert.addAction(UIAlertAction(title: "OK", style: .default) { [weak self] _ in
             // Logout and go to login screen
-            self?.viewModel.logoutAndGoToLogin()
+            self?.viewModel.logoutAndGoToLogin() // This will trigger onNavigateToLogin
         })
         
         present(alert, animated: true)
@@ -541,5 +511,48 @@ extension ChangePasswordViewController {
             textField.resignFirstResponder()
         }
         return true
+    }
+}
+
+extension ChangePasswordViewController: ChangePasswordViewModelDelegate {
+    
+    func onViewStateChanged(_ viewState: ChangePasswordViewModel.ViewState) {
+        DispatchQueue.main.async { [weak self] in
+            self?.handleViewState(viewState)
+        }
+    }
+    
+    func onNavigateToLogin() {
+        DispatchQueue.main.async { [weak self] in
+            self?.logoutAndGoToLogin()
+        }
+    }
+    
+    private func handleViewState(_ state: ChangePasswordViewModel.ViewState) {
+        switch state {
+        case .idle:
+            // Do nothing
+            break
+            
+        case .loading:
+            showLoading()
+            
+        case .success(let message):
+            hideLoading()
+            showSuccessAlert(message: message)
+            
+        case .validationError(let title, let message, let field):
+            hideLoading()
+            showAlert(title: title, message: message)
+            focusOnField(field)
+            
+        case .changePasswordError(let title, let message):
+            hideLoading()
+            showAlert(title: title, message: message)
+            
+        case .networkError(let error):
+            hideLoading()
+            handleNetworkError(error)
+        }
     }
 }

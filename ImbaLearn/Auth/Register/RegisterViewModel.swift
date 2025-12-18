@@ -5,6 +5,12 @@
 
 import Foundation
 
+protocol RegisterViewModelDelegate: AnyObject {
+    func onViewStateChanged(_ viewState: RegisterViewModel.ViewState) -> Void
+    func onNavigateToMainApp() -> Void
+    func onNavigateToLogin() -> Void
+}
+
 class RegisterViewModel {
     
     // MARK: - Properties
@@ -20,11 +26,13 @@ class RegisterViewModel {
         case networkError(error: NetworkError)
     }
     
-    // MARK: - Callbacks
-    var onViewStateChanged: ((ViewState) -> Void)?
-    var onNavigateToMainApp: (() -> Void)?
-    var onNavigateToLogin: (() -> Void)?
+    weak var delegate: RegisterViewModelDelegate?
     
+//    // MARK: - Callbacks
+//    var onViewStateChanged: ((ViewState) -> Void)?
+//    var onNavigateToMainApp: (() -> Void)?
+//    var onNavigateToLogin: (() -> Void)?
+//    
     // MARK: - Public Methods
     
     func register(fullName: String?, email: String?, password: String?, confirmPassword: String?) {
@@ -40,13 +48,13 @@ class RegisterViewModel {
         
         guard case .valid(let validatedName, let validatedEmail, let validatedPassword) = validationResult else {
             if case .invalid(let title, let message) = validationResult {
-                onViewStateChanged?(.validationError(title: title, message: message))
+                delegate?.onViewStateChanged(.validationError(title: title, message: message))
             }
             return
         }
         
         isLoading = true
-        onViewStateChanged?(.loading)
+        delegate?.onViewStateChanged(.loading)
         
         // Create request with single name field
         let registerRequest = RegisterRequest(
@@ -67,7 +75,7 @@ class RegisterViewModel {
     }
     
     func navigateToLogin() {
-        onNavigateToLogin?()
+        delegate?.onNavigateToLogin()
     }
     
     // MARK: - Validation
@@ -130,19 +138,19 @@ class RegisterViewModel {
                 saveUserData(name: name, email: email)
                 
                 // Show success
-                onViewStateChanged?(.success(message: response.message))
+                delegate?.onViewStateChanged(.success(message: response.message))
                 
                 // Auto-navigate after delay
                 DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
-                    self?.onNavigateToMainApp?()
+                    self?.delegate?.onNavigateToMainApp()
                 }
             } else {
                 // API returned error
-                onViewStateChanged?(.registrationError(title: "Registration Failed", message: response.message))
+                delegate?.onViewStateChanged(.registrationError(title: "Registration Failed", message: response.message))
             }
             
         case .failure(let error):
-            onViewStateChanged?(.networkError(error: error))
+            delegate?.onViewStateChanged(.networkError(error: error))
         }
     }
     

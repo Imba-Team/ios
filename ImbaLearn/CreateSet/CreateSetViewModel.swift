@@ -6,12 +6,12 @@ protocol CreateSetViewModelDelegate: AnyObject {
     func onTermsUpdated() -> Void
     func onValidationError(_ message: String) -> Void
     func onModuleCreationStarted() -> Void
-    func onModuleCreationSuccess() -> Void
-    func onModuleCreationFailure() -> Void
+    func onModuleCreationSuccess(_ moduleId: String) -> Void
+    func onModuleCreationFailure(_ message: String) -> Void
     func onTermsAdditionComplete(numberOfSuccess: Int, errors: [String]) -> Void
 }
 
-class CreateSetViewModel {
+final class CreateSetViewModel {
     
     // MARK: - Properties
     private(set) var terms: [Term]
@@ -19,13 +19,7 @@ class CreateSetViewModel {
     var description: String = ""
     var isPrivate: Bool = false
     
-    // MARK: - Callbacks
-    var onTermsUpdated: (() -> Void)?
-    var onValidationError: ((String) -> Void)?
-    var onModuleCreationStarted: (() -> Void)?
-    var onModuleCreationSuccess: ((String) -> Void)?
-    var onModuleCreationFailure: ((String) -> Void)?
-    var onTermsAdditionComplete: ((Int, [String]) -> Void)?
+    weak var delegate: CreateSetViewModelDelegate?
     
     // MARK: - Initialization
     init() {
@@ -38,13 +32,13 @@ class CreateSetViewModel {
     // MARK: - Term Management
     func addTerm() {
         terms.append(Term(term: "", definition: ""))
-        onTermsUpdated?()
+        delegate?.onTermsUpdated()
     }
     
     func deleteTerm(at index: Int) {
         guard index >= 0 && index < terms.count else { return }
         terms.remove(at: index)
-        onTermsUpdated?()
+        delegate?.onTermsUpdated()
     }
     
     func update(term: String, at index: Int) {
@@ -67,12 +61,12 @@ class CreateSetViewModel {
     // MARK: - Validation
     func validateForm() -> Bool {
         guard !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-            onValidationError?("Please enter a title for your module")
+            delegate?.onValidationError("Please enter a title for your module")
             return false
         }
         
         guard !getValidTerms().isEmpty else {
-            onValidationError?("Please add at least one term with both term and definition")
+            delegate?.onValidationError("Please add at least one term with both term and definition")
             return false
         }
         
@@ -83,7 +77,7 @@ class CreateSetViewModel {
     func createModule() {
         guard validateForm() else { return }
         
-        onModuleCreationStarted?()
+        delegate?.onModuleCreationStarted()
         
         let moduleRequest = CreateModuleRequest(
             title: title.trimmingCharacters(in: .whitespacesAndNewlines),
@@ -98,9 +92,9 @@ class CreateSetViewModel {
             case .success(let response):
                 if response.ok, let moduleId = response.data?.id {
                     print("✅ Module created! ID: \(moduleId)")
-                    self?.onModuleCreationSuccess?(moduleId)
+                    self?.delegate?.onModuleCreationSuccess(moduleId)
                 } else {
-                    self?.onModuleCreationFailure?(response.message)
+                    self?.delegate?.onModuleCreationFailure(response.message)
                 }
                 
             case .failure(let error):
@@ -139,7 +133,7 @@ class CreateSetViewModel {
         }
         
         dispatchGroup.notify(queue: .main) { [weak self] in
-            self?.onTermsAdditionComplete?(successfulTerms, errors)
+            self?.delegate?.onTermsAdditionComplete(numberOfSuccess: successfulTerms, errors: errors)
         }
     }
     
@@ -152,7 +146,7 @@ class CreateSetViewModel {
             Term(term: "", definition: ""),
             Term(term: "", definition: "")
         ]
-        onTermsUpdated?()
+        delegate?.onTermsUpdated()
     }
     
     // MARK: - Private Methods
@@ -168,7 +162,7 @@ class CreateSetViewModel {
         default:
             errorMessage = error.localizedDescription
         }
-        onModuleCreationFailure?(errorMessage)
+        delegate?.onModuleCreationFailure(errorMessage)
     }
     
     // MARK: - Helper Properties
